@@ -12,7 +12,7 @@ class nconv(nn.Module):
     def forward(self,x, A):
         x = torch.einsum('ncvl,vw->ncwl',(x,A))
         return x.contiguous()
-
+        
 
 class linear(nn.Module):
     def __init__(self,c_in,c_out):
@@ -22,6 +22,9 @@ class linear(nn.Module):
     def forward(self,x):
         return self.mlp(x)
 
+    def reset_parameters(self):
+        self.mlp.reset_parameters()
+        
 
 class gcn(nn.Module):
     def __init__(self, c_in, c_out, dropout, order=2):
@@ -46,6 +49,9 @@ class gcn(nn.Module):
         h = F.dropout(h, self.dropout, training=self.training)
         return h
 
+    def reset_parameters(self):
+        self.mlp.reset_parameters()
+        
 
 class gwnet(nn.Module):
     def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12, residual_channels=32, dilation_channels=32, skip_channels=256, end_channels=512, blocks=4,layers=2):
@@ -66,6 +72,7 @@ class gwnet(nn.Module):
                                     kernel_size=(1,1))
 
         receptive_field = 1
+        self.num_nodes = num_nodes
         self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
         self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
 
@@ -108,6 +115,18 @@ class gwnet(nn.Module):
 
         self.receptive_field = receptive_field
 
+
+    def reset_parameters(self):
+        for mlist in [self.filter_convs, self.gate_convs, self.residual_convs, self.skip_convs, self.bn, self.gconv]:
+            for _layer in mlist:
+                _layer.reset_parameters()
+
+        self.start_conv.reset_parameters()    
+        self.nodevec1.data.copy_(torch.randn(self.num_nodes, 10))
+        self.nodevec2.data.copy_(torch.randn(10, self.num_nodes))
+        self.end_conv_1.reset_parameters()
+        self.end_conv_2.reset_parameters()
+        
 
     def forward(self, input):
         in_len = input.size(3)

@@ -11,7 +11,7 @@ import torch.optim as optim
 import math
 
 
-# python train.py
+# python train_wavenet.py
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     in_dim = dataloader['train_loader'].xs.shape[3]
     model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
     model.to(device)
+    #model.reset_parameters()
     
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     for i in tqdm(range(args.epochs)):
