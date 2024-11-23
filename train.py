@@ -82,4 +82,4 @@ if __name__ == "__main__":
                 output = scaler.inverse_transform(output)
                 test_loss += util.ae(output, testy).item()
 
-            print(f'epoch: {i}, valid mae: {val_loss/math.prod(dataloader["val_loader"].ys.shape)}, test mae: {test_loss/math.prod(dataloader["test_loader"].ys.shape)}')
+            print(f'epoch: {i}, valid mae: {val_loss/math.prod(dataloader["val_loader"].ys.shape[:-1])}, test mae: {test_loss/math.prod(dataloader["test_loader"].ys.shape[:-1])}')
