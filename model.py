@@ -116,7 +116,7 @@ class gwnet(nn.Module):
         self.receptive_field = receptive_field
 
 
-    def reset_parameters(self):
+    def initialize(self):
         for mlist in [self.filter_convs, self.gate_convs, self.residual_convs, self.skip_convs, self.bn, self.gconv]:
             for _layer in mlist:
                 _layer.reset_parameters()
@@ -158,6 +158,7 @@ class gwnet(nn.Module):
             # GCN layer
             x = self.gconv[i](x, adj)
             x = x + residual[:, :, :, -x.size(3):]
+            x = self.bn[i](x)
 
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
