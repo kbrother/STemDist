@@ -21,6 +21,7 @@ class DataLoader(object):
         self.xs = xs
         self.ys = ys
 
+
     def shuffle(self):
         permutation = np.random.permutation(self.size)
         xs, ys = self.xs[permutation], self.ys[permutation]
@@ -76,10 +77,20 @@ def load_dataset(dataset_dir, batch_size):
     return data
 
 
-def mae(preds, labels):
+def masked_mae(preds, labels, null_val):
+    mask = (labels != null_val)
+    mask = mask.float()
+    mask /= torch.mean(mask)
     loss = torch.abs(preds - labels)
+    loss = loss * mask
     return torch.mean(loss)
 
-def ae(preds, labels):
+def masked_ae(preds, labels, null_val):
+    mask = (labels != null_val)
+    mask = mask.float()    
     loss = torch.abs(preds - labels)
-    return torch.sum(loss)
+    loss = loss * mask
+    return torch.sum(loss), torch.sum(mask)
+
+
+

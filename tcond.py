@@ -30,5 +30,17 @@ class TCond:
         data = self.data
         feat_x, feat_y = self.feat_x, self.feat_y
 
-        for i in tqdm(range(args.epochs)):
-            _model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
+        num_nodes = data['train_loader'].xs.shape[2]
+        in_dim = data['train_loader'].xs.shape[3]
+        for i in range(args.epochs):
+
+            dataloader['train_loader'].shuffle()
+            for iter, (x, y) in tqdm(enumerate(dataloader['train_loader'].get_iterator())):
+                _model = gwnet(self.device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
+
+                _model.train()
+                # Compute real gradient
+                
+
+            
+            

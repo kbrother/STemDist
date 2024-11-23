@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-b', '--batch_size', type=int, default=2**10, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**7, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=0.001,help='learning rate')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
@@ -40,6 +40,7 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
     model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
+    #model = gwnet(device, num_nodes, args.dropout, None, True, True, None, in_dim, args.seq_length, 32, 32, 256, 512, 2)
     model.to(device)
     #model.reset_parameters()
     
@@ -55,15 +56,17 @@ if __name__ == "__main__":
             trainy = trainy[:,:,:,0]
             output = model(trainx).squeeze()
             output = scaler.inverse_transform(output)
-            curr_loss = util.mae(output, trainy)
+            curr_loss = util.masked_mae(output, trainy, 0.)
 
             _optimizer.zero_grad()
             curr_loss.backward()
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
             _optimizer.step()
 
         model.eval()
-        with torch.no_grad():
+        with torch.no_grad():            
             val_loss = 0
+            num_val_entry = 0
             for iter, (x, y) in enumerate(dataloader['val_loader'].get_iterator()):
                 valx = torch.tensor(x, device=device, dtype=torch.float)
                 valx = valx.transpose(1, 3)
@@ -71,9 +74,12 @@ if __name__ == "__main__":
                 valy = valy[:,:,:,0]
                 output = model(valx).squeeze()
                 output = scaler.inverse_transform(output)
-                val_loss += util.ae(output, valy).item()
-
+                curr_val_loss, num_entry = util.masked_ae(output, valy, 0.)
+                val_loss += curr_val_loss.item()
+                num_val_entry += num_entry.item()
+            
             test_loss = 0
+            num_test_entry = 0
             for iter, (x, y) in enumerate(dataloader['test_loader'].get_iterator()):
                 testx = torch.tensor(x, device=device, dtype=torch.float)
                 testx = testx.transpose(1, 3)
@@ -81,6 +87,8 @@ if __name__ == "__main__":
                 testy = testy[:,:,:,0]
                 output = model(testx).squeeze()
                 output = scaler.inverse_transform(output)
-                test_loss += util.ae(output, testy).item()
+                curr_test_loss, num_entry = util.masked_ae(output, testy, 0.)
+                test_loss += curr_test_loss.item()
+                num_test_entry += num_entry.item()
 
-            print(f'epoch: {i}, valid mae: {val_loss/math.prod(dataloader["val_loader"].ys.shape[:-1])}, test mae: {test_loss/math.prod(dataloader["test_loader"].ys.shape[:-1])}')
+            print(f'epoch: {i}, valid mae: {val_loss/num_val_entry}, test mae: {test_loss/num_test_entry}')
