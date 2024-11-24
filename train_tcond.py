@@ -12,7 +12,7 @@ import math
 from tcond import TCond
 
 
-# python train_tcond.py
+# python train_tcond.py -lr 0.01 -rr 0.001 -e 1000 -sp results/metr-la.txt
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
@@ -26,6 +26,7 @@ if __name__ == "__main__":
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-sp', '--save_path', type=str)
     args = parser.parse_args()
 
     # random seed setting

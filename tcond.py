@@ -54,7 +54,7 @@ class TCond:
             optimizer.step()
 
             _model.module.eval()
-            if (i+1)%10 == 0:
+            if (i+1)%5 == 0:
                 with torch.no_grad():
                     val_loss = _model.module.test_model(data['val_loader'], scaler)
     
@@ -130,9 +130,11 @@ class TCond:
             _loss.backward()
             optimizer.step()
 
-            if (i+1) % 50 == 0:
+            if (i+1) % 50 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"epoch: {i}, min i: {min_i}, train_loss: {train_loss}, val loss: {val_loss}, test loss: {test_loss}")
+                with open(args.save_path, 'a') as f:
+                    f.write(f"epoch: {i}, min i: {min_i}, train_loss: {train_loss}, val loss: {val_loss}, test loss: {test_loss}\n")
             else:
                 print(f"epoch: {i}, train loss: {train_loss}")
                 
