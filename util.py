@@ -85,6 +85,12 @@ def masked_mae(preds, labels, null_val):
     loss = loss * mask
     return torch.mean(loss)
 
+
+def mae(preds, labels):
+    loss = torch.abs(preds - labels)
+    return torch.mean(loss)
+
+
 def masked_ae(preds, labels, null_val):
     mask = (labels != null_val)
     mask = mask.float()    
@@ -93,4 +99,31 @@ def masked_ae(preds, labels, null_val):
     return torch.sum(loss), torch.sum(mask)
 
 
+def distance_wb(gwr, gws):
+    shape = gwr.shape
+    if len(shape) == 4: # conv, out*in*h*w
+        gwr = gwr.reshape(shape[0], shape[1] * shape[2] * shape[3])
+        gws = gws.reshape(shape[0], shape[1] * shape[2] * shape[3])
+    elif len(shape) == 3:  # layernorm, C*h*w
+        gwr = gwr.reshape(shape[0], shape[1] * shape[2])
+        gws = gws.reshape(shape[0], shape[1] * shape[2])
+    elif len(shape) == 2: # linear, out*in
+        tmp = 'do nothing'
+    elif len(shape) == 1: # batchnorm/instancenorm, C; groupnorm x, bias
+        gwr = gwr.reshape(1, shape[0])
+        gws = gws.reshape(1, shape[0])
+        return torch.tensor(0, dtype=torch.float, device=gwr.device)
 
+    dis_weight = torch.sum(1 - torch.sum(gwr * gws, dim=-1) / (torch.norm(gwr, dim=-1) * torch.norm(gws, dim=-1) + 0.000001))
+    dis = dis_weight
+    return dis
+
+
+def match_loss(gw_syn, gw_real, device):
+    dis = torch.tensor(0.0).to(device)
+    for ig in range(len(gw_real)):
+        gwr = gw_real[ig]
+        gws = gw_syn[ig]
+        dis += distance_wb(gwr, gws)
+
+    return dis

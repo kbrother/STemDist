@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import sys
+import util
         
 
 class nconv(nn.Module):
@@ -62,9 +63,8 @@ class gwnet(nn.Module):
 
         self.filter_convs = nn.ModuleList()
         self.gate_convs = nn.ModuleList()
-        self.residual_convs = nn.ModuleList()
         self.skip_convs = nn.ModuleList()
-        self.bn = nn.ModuleList()
+        #self.bn = nn.ModuleList()
         self.gconv = nn.ModuleList()
 
         self.start_conv = nn.Conv2d(in_channels=in_dim,
@@ -72,6 +72,7 @@ class gwnet(nn.Module):
                                     kernel_size=(1,1))
 
         receptive_field = 1
+        self.device = device
         self.num_nodes = num_nodes
         self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
         self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
@@ -88,20 +89,16 @@ class gwnet(nn.Module):
                                                  out_channels=dilation_channels,
                                                  kernel_size=(1, 2), dilation=new_dilation))
 
-                # 1x1 convolution for residual connection
-                self.residual_convs.append(nn.Conv2d(in_channels=dilation_channels,
-                                                     out_channels=residual_channels,
-                                                     kernel_size=(1, 1)))
-
                 # 1x1 convolution for skip connection
                 self.skip_convs.append(nn.Conv2d(in_channels=dilation_channels,
                                                  out_channels=skip_channels,
                                                  kernel_size=(1, 1)))
 
-                self.bn.append(nn.BatchNorm2d(residual_channels))
+                #self.bn.append(nn.BatchNorm2d(residual_channels))
                 receptive_field += new_dilation
                 new_dilation *=2
-                self.gconv.append(gcn(dilation_channels, residual_channels, dropout))
+                if (b<blocks-1) or (i<layers - 1):
+                    self.gconv.append(gcn(dilation_channels, residual_channels, dropout))
 
         self.end_conv_1 = nn.Conv2d(in_channels=skip_channels,
                                   out_channels=end_channels,
@@ -117,7 +114,7 @@ class gwnet(nn.Module):
 
 
     def initialize(self):
-        for mlist in [self.filter_convs, self.gate_convs, self.residual_convs, self.skip_convs, self.bn, self.gconv]:
+        for mlist in [self.filter_convs, self.gate_convs, self.skip_convs, self.gconv]:
             for _layer in mlist:
                 _layer.reset_parameters()
 
@@ -156,11 +153,28 @@ class gwnet(nn.Module):
             skip = skip + s
 
             # GCN layer
-            x = self.gconv[i](x, adj)
-            x = x + residual[:, :, :, -x.size(3):]
-            x = self.bn[i](x)
+            if i<(self.blocks*self.layers)-1:
+                x = self.gconv[i](x, adj)
+                x = x + residual[:, :, :, -x.size(3):]
+            #x = self.bn[i](x)
 
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
         return x
+
+
+    def test_model(self, dataloader, scaler):
+        loss_sum, num_entry = 0, 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            x = torch.tensor(x, device=self.device, dtype=torch.float)
+            x = x.transpose(1, 3)
+            y = torch.tensor(y, device=self.device, dtype=torch.float)
+            y = y[:,:,:,0]
+            output = self.forward(x).squeeze()
+            output = scaler.inverse_transform(output)
+            curr_loss, num_entry = util.masked_ae(output, y, 0.)
+            loss_sum += curr_loss.item()
+            num_entry += num_entry.item()   
+        return loss_sum/num_entry
+    
