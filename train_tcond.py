@@ -3,20 +3,20 @@ import numpy as np
 import argparse
 import time
 import util
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import random
 from model import *
 import torch.optim as optim
 import math
 from tcond import TCond
+from core_set import *
 
 
-# python train_tcond.py -lr 0.1 -rr 0.001 -e 1000 -sp results/metr-la-lr0.1.txt
-# python train_tcond.py -lr 0.01 -rr 0.001 -e 1000 -sp results/metr-la-lr0.01.txt
-# python train_tcond.py -lr 0.001 -rr 0.001 -e 1000 -sp results/metr-la-lr0.001.txt
+# python train_tcond.py ours -lr 0.1 -rr 0.001 -e 1000 -sp results/metr-la-lr0.1.txt
+# python train_tcond.py random -rr 0.001 -e 1000 -sp results/random_metr-la_rr0.001.txt -de 0 -b 64
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('agent', type=str, help='which algorithm?')
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
@@ -40,5 +40,8 @@ if __name__ == "__main__":
     device = torch.device(f"cuda:{args.device}")
     dataloader = util.load_dataset(args.data, args.batch_size)
 
-    _tcond = TCond(dataloader, args, device)
+    if args.agent == "ours":
+        _tcond = TCond(dataloader, args, device)
+    elif args.agent == "random":
+        _tcond = RandomSample(dataloader, args, device)
     _tcond.train()
