@@ -57,7 +57,7 @@ class Coreset:
         with torch.no_grad():
             test_loss = _model.module.test_model(data['test_loader'], scaler)
 
-        return min_val_loss, test_loss
+        return min_i, min_val_loss, test_loss
 
 
 class RandomSample(Coreset):

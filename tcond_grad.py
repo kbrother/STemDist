@@ -5,25 +5,28 @@ import torch
 import util
 import sys
 import copy
+import random
 
 
-class TCond:
+class TCondGrad:
 
     def __init__(self, data, args, device):
         self.data = data
         self.args = args
         self.device = device
         self.num_elems = int(args.reduction_rate *  data['train_loader'].xs.shape[0])
-
+        scaler = data['scaler']
+        
         # Define condensed data
-        _shape = list(data['train_loader'].xs.shape[1:])
-        _shape = tuple([self.num_elems] + _shape)
-        self.synx = torch.rand(_shape, device=device, dtype=torch.float)
+        num_total = data['train_loader'].xs.shape[0]
+        sampled_idx = random.sample(list(range(num_total)), self.num_elems)
+        self.synx = self.data['train_loader'].xs[sampled_idx]     
+        self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         self.synx = nn.Parameter(self.synx)
-
-        _shape = list(data['train_loader'].ys.shape[1:-1])
-        _shape = tuple([self.num_elems] + _shape)
-        self.syny = torch.rand(_shape, device=device, dtype=torch.float)
+        
+        self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
+        self.syny = scaler.transform(self.syny)
+        self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
@@ -76,15 +79,14 @@ class TCond:
         data = self.data
         synx, syny = self.synx, self.syny
 
-        print(data['train_loader'].xs.shape[0])
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
 
-
         min_i, val_loss, test_loss = self.test_syn()
         print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        
+        with open(args.save_path, 'a') as f:
+            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
         optimizer = torch.optim.Adam([synx, syny], lr=args.learning_rate)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()
@@ -92,6 +94,7 @@ class TCond:
                                residual_channels=args.nhid, dilation_channels=args.nhid, 
                                skip_channels=8*args.nhid, end_channels=16*args.nhid)
             model_params = list(_model.parameters())
+            _model.initialize()
             _model.to(self.device)
             _model = nn.DataParallel(_model, device_ids=[0,1,2,3])
             _model.module.train()
@@ -135,7 +138,7 @@ class TCond:
             _loss.backward()
             optimizer.step()
 
-            if (i+1) % 50 == 0:                
+            if (i+1) % 10 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"epoch: {i}, min i: {min_i}, train_loss: {train_loss}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path, 'a') as f:

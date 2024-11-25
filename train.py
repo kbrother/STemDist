@@ -8,12 +8,14 @@ import random
 from model import *
 import torch.optim as optim
 import math
-from tcond import TCond
+from tcond_grad import TCondGrad
 from core_set import *
+from tcond_dist import TCondDist
 
 
-# python train_tcond.py ours -lr 0.1 -rr 0.001 -e 1000 -sp results/metr-la-lr0.1.txt
-# python train_tcond.py random -rr 0.001 -e 1000 -sp results/random_metr-la_rr0.001.txt -de 0 -b 64
+# python train.py ours_g -lr 0.001 -rr 0.001 -e 1000 -sp results/metr-la-lr0.001.txt
+# python train.py ours_d -lr 0.01 -rr 0.001 -e 1000 -sp results/oursd_metr-la_lr0.01.txt
+# python train.py random -rr 0.001 -e 1000 -sp results/random_metr-la_rr0.001.txt -de 0 -b 64
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('agent', type=str, help='which algorithm?')
@@ -40,8 +42,10 @@ if __name__ == "__main__":
     device = torch.device(f"cuda:{args.device}")
     dataloader = util.load_dataset(args.data, args.batch_size)
 
-    if args.agent == "ours":
-        _tcond = TCond(dataloader, args, device)
+    if args.agent == "ours_g":
+        _tcond = TCondGrad(dataloader, args, device)
+    elif args.agent == "ours_d":
+        _tcond = TCondDist(dataloader, args, device)
     elif args.agent == "random":
         _tcond = RandomSample(dataloader, args, device)
     _tcond.train()
