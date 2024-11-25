@@ -167,14 +167,14 @@ class gwnet(nn.Module):
     def test_model(self, dataloader, scaler):
         loss_sum, num_entry = 0, 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            x = torch.tensor(x, device=self.device, dtype=torch.float)
-            x = x.transpose(1, 3)
-            y = torch.tensor(y, device=self.device, dtype=torch.float)
-            y = y[:,:,:,0]
-            output = self.forward(x).squeeze()
+            valx = torch.tensor(x, device=self.device, dtype=torch.float)
+            valx = valx.transpose(1, 3)
+            valy = torch.tensor(y, device=self.device, dtype=torch.float)
+            valy = valy[:,:,:,0]
+            output = self.forward(valx).squeeze()
             output = scaler.inverse_transform(output)
-            curr_loss, num_entry = util.masked_ae(output, y, 0.)
+            curr_loss, num_curr_entry = util.masked_ae(output, valy, 0.)
             loss_sum += curr_loss.item()
-            num_entry += num_entry.item()   
+            num_entry += num_curr_entry.item()               
         return loss_sum/num_entry
     

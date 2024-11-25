@@ -43,9 +43,9 @@ class TCond:
                            skip_channels=8*args.nhid, end_channels=16*args.nhid)
         _model.to(self.device)
         _model = nn.DataParallel(_model, device_ids=[0,1,2,3])
-        optimizer = torch.optim.Adam(_model.module.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(_model.module.parameters(), lr=0.001, weight_decay=0.0001)
         min_val_loss = sys.float_info.max
-        for i in tqdm(range(100)):
+        for i in tqdm(range(200)):
             _model.module.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             loss_syn = util.mae(output_syn, syny)
@@ -54,7 +54,7 @@ class TCond:
             optimizer.step()
 
             _model.module.eval()
-            if (i+1)%5 == 0:
+            if (i+1)%20 == 0:
                 with torch.no_grad():
                     val_loss = _model.module.test_model(data['val_loader'], scaler)
     
@@ -76,10 +76,15 @@ class TCond:
         data = self.data
         synx, syny = self.synx, self.syny
 
+        print(data['train_loader'].xs.shape[0])
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
 
+
+        min_i, val_loss, test_loss = self.test_syn()
+        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        
         optimizer = torch.optim.Adam([synx, syny], lr=args.learning_rate)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()

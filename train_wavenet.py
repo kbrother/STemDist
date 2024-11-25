@@ -60,35 +60,10 @@ if __name__ == "__main__":
 
             _optimizer.zero_grad()
             curr_loss.backward()
-            #torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
             _optimizer.step()
 
         model.eval()
-        with torch.no_grad():            
-            val_loss = 0
-            num_val_entry = 0
-            for iter, (x, y) in enumerate(dataloader['val_loader'].get_iterator()):
-                valx = torch.tensor(x, device=device, dtype=torch.float)
-                valx = valx.transpose(1, 3)
-                valy = torch.tensor(y, device=device, dtype=torch.float)
-                valy = valy[:,:,:,0]
-                output = model(valx).squeeze()
-                output = scaler.inverse_transform(output)
-                curr_val_loss, num_entry = util.masked_ae(output, valy, 0.)
-                val_loss += curr_val_loss.item()
-                num_val_entry += num_entry.item()
-            
-            test_loss = 0
-            num_test_entry = 0
-            for iter, (x, y) in enumerate(dataloader['test_loader'].get_iterator()):
-                testx = torch.tensor(x, device=device, dtype=torch.float)
-                testx = testx.transpose(1, 3)
-                testy = torch.tensor(y, device=device, dtype=torch.float)
-                testy = testy[:,:,:,0]
-                output = model(testx).squeeze()
-                output = scaler.inverse_transform(output)
-                curr_test_loss, num_entry = util.masked_ae(output, testy, 0.)
-                test_loss += curr_test_loss.item()
-                num_test_entry += num_entry.item()
-
-            print(f'epoch: {i}, valid mae: {val_loss/num_val_entry}, test mae: {test_loss/num_test_entry}')
+        with torch.no_grad():               
+            val_mae = model.test_model(dataloader['val_loader'], scaler)
+            test_mae = model.test_model(dataloader['test_loader'], scaler)            
+            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')

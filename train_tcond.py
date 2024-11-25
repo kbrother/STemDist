@@ -12,7 +12,9 @@ import math
 from tcond import TCond
 
 
-# python train_tcond.py -lr 0.01 -rr 0.001 -e 1000 -sp results/metr-la.txt
+# python train_tcond.py -lr 0.1 -rr 0.001 -e 1000 -sp results/metr-la-lr0.1.txt
+# python train_tcond.py -lr 0.01 -rr 0.001 -e 1000 -sp results/metr-la-lr0.01.txt
+# python train_tcond.py -lr 0.001 -rr 0.001 -e 1000 -sp results/metr-la-lr0.001.txt
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
