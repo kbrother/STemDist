@@ -10,10 +10,10 @@ import torch.optim as optim
 import math
 from tcond_grad import TCondGrad
 from core_set import *
-from tcond_dist import TCondDist
+from tcond_grad_clus import TCondGradClus
 
 
-# python train.py ours_g -lr 0.001 -rr 0.001 -e 1000 -sp results/metr-la-lr0.001.txt
+# python train.py ours_gc -lr 0.001 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
 # python train.py ours_d -lr 0.01 -rr 0.001 -e 1000 -sp results/oursd_metr-la_lr0.01.txt
 # python train.py random -rr 0.001 -e 1000 -sp results/random_metr-la_rr0.001.txt -de 0 -b 64
 # python train.py kmeans -rr 0.001 -e 1000 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64
@@ -45,8 +45,8 @@ if __name__ == "__main__":
 
     if args.agent == "ours_g":
         _tcond = TCondGrad(dataloader, args, device)
-    elif args.agent == "ours_d":
-        _tcond = TCondDist(dataloader, args, device)
+    elif args.agent == "ours_gc":
+        _tcond = TCondGradClus(dataloader, args, device)
     elif args.agent == "random":
         _tcond = RandomSample(dataloader, args, device)
     elif args.agent == "kmeans":

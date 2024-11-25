@@ -89,7 +89,7 @@ def get_cluster(vecs, num_cents, device):
 
     torch_vecs = torch.tensor(vecs, device=device)
     centroids = 2*(np.random.rand(num_cents, vecs.shape[1]) - 0.5)    
-    for i in tqdm(range(90)):
+    for i in tqdm(range(80)):
         curr_dist = torch.zeros((num_cents, num_entry), device=device)
         torch_centroids = torch.tensor(centroids, device=device)
         for j in range(num_cents):
