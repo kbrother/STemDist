@@ -8,7 +8,7 @@ import copy
 import random
 
 
-class TCondGrad:
+class GwaveGrad:
 
     def __init__(self, data, args, device):
         self.data = data

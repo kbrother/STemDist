@@ -10,7 +10,7 @@ from core_set import get_cluster
 import numpy as np
 
 
-class TCondGradClus:
+class GwaveGradClus:
 
     def __init__(self, data, args, device):
         self.data = data
