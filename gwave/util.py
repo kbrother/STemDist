@@ -41,7 +41,15 @@ class DataLoader(object):
                 self.current_ind += 1
 
         return _wrapper()
-        
+
+    def get_next(self):
+        start_ind = self.batch_size * self.current_ind
+        end_ind = min(self.size, self.batch_size * (self.current_ind + 1))
+        x_i = self.xs[start_ind: end_ind, ...]
+        y_i = self.ys[start_ind: end_ind, ...]        
+        self.current_ind += 1        
+        return (x_i, y_i)
+
 
 class StandardScaler():
     """

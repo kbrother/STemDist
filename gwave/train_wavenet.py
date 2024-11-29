@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-b', '--batch_size', type=int, default=2**7, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=0.001,help='learning rate')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
