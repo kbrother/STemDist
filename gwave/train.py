@@ -15,8 +15,8 @@ from gwave_grad_clus import GwaveGradClus
 
 # python gwave/train.py ours_gc -lr 0.01 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
 # python gwave/train.py ours_g -lr 0.01 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.001.txt
-# python train.py random -rr 0.001 -e 1000 -sp results/random_metr-la_rr0.001.txt -de 0 -b 64
-# python train.py kmeans -rr 0.001 -e 1000 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64
+# python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 5
+# python gwave/train.py kmeans -rr 0.001 -e 100 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('agent', type=str, help='which algorithm?')

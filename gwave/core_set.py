@@ -31,11 +31,10 @@ class Coreset:
                            residual_channels=args.nhid, dilation_channels=args.nhid, 
                            skip_channels=8*args.nhid, end_channels=16*args.nhid)
         _model.to(self.device)
-        _model = nn.DataParallel(_model, device_ids=[0, 1,2,3])
-        optimizer = torch.optim.Adam(_model.module.parameters(), lr=0.001, weight_decay=0.0001)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=0.001, weight_decay=0.0001)
         min_val_loss = sys.float_info.max
         for i in tqdm(range(200)):
-            _model.module.train()
+            _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
             loss_syn = util.mae(output_syn, syny)
@@ -43,20 +42,20 @@ class Coreset:
             loss_syn.backward()
             optimizer.step()
 
-            _model.module.eval()
+            _model.eval()
             if (i+1)%20 == 0:
                 with torch.no_grad():
-                    val_loss = _model.module.test_model(data['val_loader'], scaler)
+                    val_loss = _model.test_model(data['val_loader'], scaler)
     
                 if min_val_loss > val_loss:
                     min_i = i
                     min_val_loss = val_loss
-                    min_params = copy.deepcopy(_model.module.state_dict())
+                    min_params = copy.deepcopy(_model.state_dict())
 
-        _model.module.load_state_dict(min_params)
-        _model.module.eval()
+        _model.load_state_dict(min_params)
+        _model.eval()
         with torch.no_grad():
-            test_loss = _model.module.test_model(data['test_loader'], scaler)
+            test_loss = _model.test_model(data['test_loader'], scaler)
 
         return min_i, min_val_loss, test_loss
 

@@ -11,7 +11,8 @@ import torch.optim as optim
 import math
 
 
-# python train_wavenet.py
+# python gwave/train_wavenet.py -de 5
+# python gwave/train_wavenet.py -de 5 -d ../data/PEMS-BAY
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')

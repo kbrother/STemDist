@@ -18,6 +18,7 @@ class GwaveGrad:
         scaler = data['scaler']
         
         # Define condensed data
+        '''
         _shape = [self.num_elems] + list(data['train_loader'].xs.shape[1:])
         self.synx = torch.rand(tuple(_shape), device=device, dtype=torch.float)
         _shape = [self.num_elems] + list(data['train_loader'].ys.shape[1:-1])
@@ -31,7 +32,6 @@ class GwaveGrad:
         self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
         self.syny = scaler.transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
-        '''
         
         self.synx = nn.Parameter(self.synx)
         self.syny = nn.Parameter(self.syny)
