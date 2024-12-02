@@ -4,8 +4,10 @@ import random
 import numpy as np
 import torch
 from core_set import *
+from agcrn_grad import AgcrnGrad
 
-# python train.py random -de 0 -lr 0.01 -e 300
+# python train.py ours_g -de 3 -lr 0.1 -e 1000 -sp results/agcrn_ours_init_lr0.01.txt
+# python train.py random -de 6 -sp results/agcrn_random.txt
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('agent', type=str, help='which algorithm?')
@@ -19,6 +21,7 @@ if __name__ == "__main__":
     args.add_argument('-e', '--epochs', default=100, type=int)
     args.add_argument('-rr', '--reduction_rate',type=float,default=0.005,help='learning rate')
     args.add_argument('-s', '--seed', type=int, default=0, help='')
+    args.add_argument('-sp', '--save_path', type=str, default='results/', help='data path')
     args = args.parse_args()   
     
     # random seed setting
@@ -32,4 +35,6 @@ if __name__ == "__main__":
 
     if args.agent == "random":
         _tcond = RandomSample([train_loader, val_loader, test_loader], args, device, scaler)
+    elif args.agent == "ours_g":
+        _tcond = AgcrnGrad(args,[train_loader, val_loader, test_loader], device, scaler)
     _tcond.train()

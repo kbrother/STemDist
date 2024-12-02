@@ -99,6 +99,11 @@ def mae(preds, labels):
     return torch.mean(loss)
 
 
+def mse(preds, labels):
+    loss = torch.square(preds - labels)
+    return torch.mean(loss)
+
+
 def masked_ae(preds, labels, null_val):
     mask = (labels != null_val)
     mask = mask.float()    
@@ -106,6 +111,12 @@ def masked_ae(preds, labels, null_val):
     loss = loss * mask
     return torch.sum(loss), torch.sum(mask)
 
+def masked_se(preds, labels, null_val):
+    mask = (labels != null_val)
+    mask = mask.float()    
+    loss = torch.square(preds - labels)
+    loss = loss * mask
+    return torch.sum(loss), torch.sum(mask)
 
 def distance_wb(gwr, gws):
     shape = gwr.shape

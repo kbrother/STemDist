@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 def test_model(model, _dataloader, scaler, device):
-    model.module.eval()
+    model.eval()
     total_loss = 0
     num_entry = 0
     with torch.no_grad():
@@ -26,7 +26,7 @@ def test_model(model, _dataloader, scaler, device):
     return total_loss / num_entry        
     
 
-# python train_agcrn.py -de 0 
+# python train_agcrn.py -de 0 -lr 0.
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('-de', '--device', type=int, default=0, help='')
@@ -54,9 +54,8 @@ if __name__ == "__main__":
         else:
             nn.init.uniform_(p)
 
-    model = torch.nn.DataParallel(model, device_ids=[0, 1, 2, 3])
     for e in tqdm(range(args.epochs)):
-        model.module.train()
+        model.train()
         train_loss, num_entry = 0, 0
         for b_data, b_target in train_loader:
             b_data = torch.stack(tuple(b_data), dim=0).to(device)

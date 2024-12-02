@@ -14,8 +14,8 @@ from gwave_grad_clus import GwaveGradClus
 
 
 # python gwave/train.py ours_gc -lr 0.01 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
-# python gwave/train.py ours_g -lr 0.01 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.001.txt
-# python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 5
+# python gwave/train.py ours_g -lr 0.1 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.1.txt
+# python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 3
 # python gwave/train.py kmeans -rr 0.001 -e 100 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
-    parser.add_argument('-lr', '--learning_rate',type=float,default=0.001,help='learning rate')
+    parser.add_argument('-lr', '--learning_rate',type=float,default=1e-4,help='learning rate')
     parser.add_argument('-rr', '--reduction_rate',type=float,default=0.005,help='learning rate')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')

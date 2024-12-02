@@ -31,13 +31,13 @@ class Coreset:
                            residual_channels=args.nhid, dilation_channels=args.nhid, 
                            skip_channels=8*args.nhid, end_channels=16*args.nhid)
         _model.to(self.device)
-        optimizer = torch.optim.Adam(_model.parameters(), lr=0.001, weight_decay=0.0001)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=1e-4, weight_decay=0.0001)
         min_val_loss = sys.float_info.max
         for i in tqdm(range(200)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
-            loss_syn = util.mae(output_syn, syny)
+            loss_syn = util.mse(output_syn, syny)
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()

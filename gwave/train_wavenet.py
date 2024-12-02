@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
-    parser.add_argument('-lr', '--learning_rate',type=float,default=0.001,help='learning rate')
+    parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
@@ -57,7 +57,8 @@ if __name__ == "__main__":
             trainy = trainy[:,:,:,0]
             output = model(trainx).squeeze()
             output = scaler.inverse_transform(output)
-            curr_loss = util.masked_mae(output, trainy, 0.)
+            curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)
+            curr_loss /= num_val_entry
 
             _optimizer.zero_grad()
             curr_loss.backward()

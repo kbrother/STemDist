@@ -18,7 +18,7 @@ class GwaveGrad:
         scaler = data['scaler']
         
         # Define condensed data
-        '''
+    
         _shape = [self.num_elems] + list(data['train_loader'].xs.shape[1:])
         self.synx = torch.rand(tuple(_shape), device=device, dtype=torch.float)
         _shape = [self.num_elems] + list(data['train_loader'].ys.shape[1:-1])
@@ -32,7 +32,7 @@ class GwaveGrad:
         self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
         self.syny = scaler.transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
-        
+        '''
         self.synx = nn.Parameter(self.synx)
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
@@ -52,12 +52,12 @@ class GwaveGrad:
                            residual_channels=args.nhid, dilation_channels=args.nhid, 
                            skip_channels=8*args.nhid, end_channels=16*args.nhid)
         _model.to(self.device)
-        optimizer = torch.optim.Adam(_model.parameters(), lr=0.001, weight_decay=0.0001)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=1e-4, weight_decay=0.0001)
         min_val_loss = sys.float_info.max
         for i in tqdm(range(200)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
-            loss_syn = util.mae(output_syn, syny)
+            loss_syn = util.mse(output_syn, syny)
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
@@ -104,7 +104,7 @@ class GwaveGrad:
             _model.initialize()
             _model.to(self.device)
             _model.train()
-            optimizer_model = torch.optim.Adam(model_params, lr=0.001)
+            optimizer_model = torch.optim.Adam(model_params, lr=0.0001)
 
             train_loss = 0
             num_ol = 20
@@ -113,7 +113,7 @@ class GwaveGrad:
                 #pbar = tqdm(total=data['train_loader'].xs.shape[0])
                 # compute synthetic gradient
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
-                loss_syn = util.mae(output_syn, syny)
+                loss_syn = util.mse(output_syn, syny)
                 gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
 
                 # Compute real gradient                            
@@ -124,7 +124,7 @@ class GwaveGrad:
                 realy = realy[:,:,:,0]
                 output_real = _model(realx).squeeze()
                 output_real = scaler.inverse_transform(output_real)
-                loss_real, num_real = util.masked_ae(output_real, realy, 0.)
+                loss_real, num_real = util.masked_se(output_real, realy, 0.)
                 gw_real = torch.autograd.grad(loss_real/num_real, model_params)
                 gw_real = list((_.detach().clone() for _ in gw_real))                
                     
@@ -146,7 +146,7 @@ class GwaveGrad:
                 for il in range(num_il):
                     optimizer_model.zero_grad()
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
-                    loss_syn_in = util.mae(output_syn_in, syny_in)
+                    loss_syn_in = util.mse(output_syn_in, syny_in)
                     loss_syn_in.backward()
                     optimizer_model.step()
                     

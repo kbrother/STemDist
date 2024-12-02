@@ -173,7 +173,7 @@ class gwnet(nn.Module):
             valy = valy[:,:,:,0]
             output = self.forward(valx).squeeze()
             output = scaler.inverse_transform(output)
-            curr_loss, num_curr_entry = util.masked_ae(output, valy, 0.)
+            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
             loss_sum += curr_loss.item()
             num_entry += num_curr_entry.item()               
         return loss_sum/num_entry
