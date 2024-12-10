@@ -16,7 +16,7 @@ import math
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
-    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-d', '--data', type=str, default='../../data/METR-LA', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
-    parser.add_argument('-sp', '--save_path', type=str, default='../data/params/METR-LA/')
+    parser.add_argument('-sp', '--save_path', type=str, default='../../data/params/METR-LA/')
     parser.add_argument('-ne', '--num_experts', type=int, default=20)
     args = parser.parse_args()
     
