@@ -11,7 +11,7 @@ import torch.optim as optim
 import math
 
 
-# python gwave/train_wavenet.py -de 5
+# python gwave/train_wavenet.py -de 0 -lr 1e-2
 # python gwave/train_wavenet.py -de 5 -d ../data/PEMS-BAY
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         dataloader['train_loader'].shuffle()
         for iter, (x, y) in enumerate(dataloader['train_loader'].get_iterator()):
             trainx = torch.tensor(x, device=device, dtype=torch.float)
-            trainx= trainx.transpose(1, 3)
+            trainx = trainx.transpose(1, 3)
             trainy = torch.tensor(y, device=device, dtype=torch.float)
             trainy = trainy[:,:,:,0]
             output = model(trainx).squeeze()
