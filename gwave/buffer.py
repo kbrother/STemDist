@@ -50,7 +50,7 @@ if __name__ == "__main__":
         #model.reset_parameters()
 
         curr_traj = [[p.detach().cpu() for p in model.parameters()]]        
-        _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+        _optimizer = optim.SGD(model.parameters(), lr=args.learning_rate)
         for i in tqdm(range(args.epochs)):
             model.train()
             dataloader['train_loader'].shuffle()
