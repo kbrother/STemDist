@@ -106,8 +106,8 @@ def get_cluster(vecs, num_cents, device):
             centroids[mapping[j]] += vecs[j]
             _cnt[mapping[j]] += 1
         
-        for i in range(num_cents):
-            centroids[i] /= _cnt[i]
+        for j in range(num_cents):
+            centroids[j] /= _cnt[j]
 
     return mapping
     
