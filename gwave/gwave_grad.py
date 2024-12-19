@@ -21,8 +21,10 @@ class GwaveGrad:
     
         _shape = [self.num_elems] + list(data['train_loader'].xs.shape[1:])
         self.synx = torch.rand(tuple(_shape), device=device, dtype=torch.float)
+        # num elems x seq len x num point x feature
         _shape = [self.num_elems] + list(data['train_loader'].ys.shape[1:-1])
         self.syny = torch.rand(_shape, device=device, dtype=torch.float)
+        # num elems x seq len x num point
         '''
         num_total = data['train_loader'].xs.shape[0]
         sampled_idx = random.sample(list(range(num_total)), self.num_elems)
@@ -89,10 +91,10 @@ class GwaveGrad:
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
 
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(args.save_path, 'a') as f:
-            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
+        #min_i, val_loss, test_loss = self.test_syn()
+        #print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        #with open(args.save_path, 'a') as f:
+        #    f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
         optimizer = torch.optim.Adam([synx, syny], lr=args.learning_rate)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()

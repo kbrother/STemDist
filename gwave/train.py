@@ -11,6 +11,7 @@ import math
 from gwave_grad import GwaveGrad
 from core_set import *
 from gwave_traj import GwaveTraj
+from gwave_grad_clus import GwaveGradClus
 
 
 # python gwave/train.py ours_gc -lr 0.01 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
@@ -40,6 +41,8 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-ss', '--syn_steps', type=int, default=21, help='')
     parser.add_argument('-sp', '--save_path', type=str)
+    parser.add_argument('-mp', '--mapping_path', type=str, default='mapping/METR-LA.npy')
+    parser.add_argument('-nc', '--num_clusters', type=int, default=5, help='')
     args = parser.parse_args()
 
     # random seed setting
