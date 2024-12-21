@@ -39,7 +39,7 @@ class GwaveGrad:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
-
+        
 
     def test_syn(self):
         args = self.args
@@ -108,7 +108,7 @@ class GwaveGrad:
             _model.train()
             optimizer_model = torch.optim.Adam(model_params, lr=0.0001)
 
-            train_loss = 0
+            grad_loss, dist_loss = 0, 0
             num_ol = 20
             num_real_total = 0
             for ol in range(num_ol):
@@ -123,18 +123,27 @@ class GwaveGrad:
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realx = realx.transpose(1, 3)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                realy = realy[:,:,:,0]
-                output_real = _model(realx).squeeze()
-                output_real = scaler.inverse_transform(output_real)
+                realy = realy[:,:,:,0]  # batch x seq len x num node
+                output_real_temp = _model(realx).squeeze()
+                output_real = scaler.inverse_transform(output_real_temp)
                 loss_real, num_real = util.masked_se(output_real, realy, 0.)
-                gw_real = torch.autograd.grad(loss_real/num_real, model_params)
+                gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                 gw_real = list((_.detach().clone() for _ in gw_real))                
                     
                 #pbar.close()
                 _loss = util.match_loss(gw_syn, gw_real, self.device)
-                train_loss += loss_real.item()
-                num_real_total += num_real
-                
+                grad_loss += _loss.item()
+
+                '''
+                    Distribution matching
+                '''                  
+                if ol >= num_ol//2:
+                    r_mean = torch.mean(output_real_temp, dim=0)
+                    s_mean = torch.mean(output_syn, dim=0)
+                    _loss2 = 100*torch.sum(torch.square(r_mean - s_mean))
+                    _loss += _loss2
+                    dist_loss += _loss2.item()
+                    
                 # gradient descent
                 optimizer.zero_grad()
                 _loss.backward()
@@ -154,9 +163,9 @@ class GwaveGrad:
                     
             if (i+1) % 10 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
-                print(f"epoch: {i}, min i: {min_i}, train_loss: {train_loss/num_real_total}, val loss: {val_loss}, test loss: {test_loss}")
+                print(f"epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path, 'a') as f:
-                    f.write(f"epoch: {i}, min i: {min_i}, train_loss: {train_loss/num_real_total}, val loss: {val_loss}, test loss: {test_loss}\n")
+                    f.write(f"epoch: {i}, min i: {min_i},. val loss: {val_loss}, test loss: {test_loss}\n")
             else:
-                print(f"epoch: {i}, train loss: {train_loss/num_real_total}")
+                print(f"epoch: {i}, grad loss: {grad_loss/num_ol}, dist loss: {2*dist_loss/num_ol}")
                 
