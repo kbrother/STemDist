@@ -17,7 +17,7 @@ from gwave_grad_freq import GwaveGradFreq
 # python gwave/train.py ours_gc -lr 0.01 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
 # python gwave/train.py ours_g -lr 0.01 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.01.txt
 # python gwave/train.py ours_gf -lr 0.01 -rr 0.001 -e 1000 -sp results/ours_gf_pemsbay_lr0.01.txt
-# CUDA_VISIBLE_DEVICES=2 python gwave/train.py ours_tf -lr 10 -rr 0.001 -e 1000 -sp results/ours_tf_metrc-la_lr0.1.txt
+# python gwave/train.py ours_tf -lr 10 -rr 0.001 -e 1000 -sp results/ours_tf_metrc-la_lr0.1.txt
 # python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 3
 # python gwave/train.py kmeans -rr 0.001 -e 100 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64
 # python gwave/train.py ours_t -de 7 -lr 0.1 -lrl 1e-5 -e 100 -sp results/ourst_metrc-la.txt
