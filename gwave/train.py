@@ -14,7 +14,7 @@ from gwave_traj import GwaveTraj
 from gwave_grad_clus import GwaveGradClus
 
 
-# python gwave/train.py ours_gc -lr 0.01 -rr 0.001 -e 1000 -sp results/oursgc_metrc-la_lr0.001.txt
+# python gwave/train.py ours_gc -de 3 -lr 0.01 -rr 0.001 -e 1000 -b 64 -sp results/oursgc_metrc-la_low-batch.txt
 # python gwave/train.py ours_g -lr 0.1 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.1.txt
 # python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 3
 # python gwave/train.py kmeans -rr 0.001 -e 100 -sp results/kmeans_metr-la_rr0.001.txt -de 0 -b 64

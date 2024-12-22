@@ -35,9 +35,7 @@ class GwaveGradClus(GwaveGrad):
         for i in tqdm(range(args.epochs)):
             if i == args.epochs//2:
                 optimizer = torch.optim.Adam([synx, syny], lr=args.learning_rate/10)
-                
-            data['train_loader'].shuffle()
-            data['train_loader'].current_ind = 0            
+                         
             _model = gwnet(self.device, num_nodes, 0, in_dim, args.seq_length, 
                                residual_channels=args.nhid, dilation_channels=args.nhid, 
                                skip_channels=8*args.nhid, end_channels=16*args.nhid)
@@ -50,7 +48,9 @@ class GwaveGradClus(GwaveGrad):
             train_loss = 0
             num_ol = 20
             num_real_total = 0
-            for ol in range(num_ol):                
+            for ol in range(num_ol):  
+                data['train_loader'].shuffle()
+                data['train_loader'].current_ind = 0   
                 # compute synthetic gradient
                 output_syn = _model(synx.transpose(1, 3)).squeeze()  # batch x seq len x num point
 
@@ -74,10 +74,9 @@ class GwaveGradClus(GwaveGrad):
                     loss_real, num_real = util.masked_se(output_real[:, :, self.cluster2node[cl]], 
                                                          realy[:,:,self.cluster2node[cl]], 0.)
 
-                    if cl == args.num_clusters - 1:
-                        gw_real = torch.autograd.grad(loss_real/num_real, model_params)
-                    else:
-                        gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
+                                            
+                    gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
+                    #    gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                     gw_real = list((_.detach().clone() for _ in gw_real))      
                     _loss += self.cluster2weight[cl] * util.match_loss(gw_syn, gw_real, self.device)
                 #pbar.close()                
@@ -91,12 +90,20 @@ class GwaveGradClus(GwaveGrad):
                     break
                     
                 num_il = 5
-                synx_in, syny_in = synx.detach(), syny.detach()
                 for il in range(num_il):
+                    x, y = data['train_loader'].get_next()
+                    realx = torch.tensor(x, device=self.device, dtype=torch.float)
+                    realx = realx.transpose(1, 3)
+                    realy = torch.tensor(y, device=self.device, dtype=torch.float)
+                    realy = realy[:,:,:,0]
+                    output_real = _model(realx).squeeze()
+                    output_real = scaler.inverse_transform(output_real)
+
+                    # Compute real gradient                                                
+                    loss_real_in, num_real_in = util.masked_se(output_real, realy, 0.)
+                    loss_real_in /= num_real_in
                     optimizer_model.zero_grad()
-                    output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
-                    loss_syn_in = util.mse(output_syn_in, syny_in)
-                    loss_syn_in.backward()
+                    loss_real_in.backward()
                     optimizer_model.step()
                     
             if (i+1) % 10 == 0:                
