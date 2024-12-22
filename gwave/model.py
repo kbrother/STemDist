@@ -177,4 +177,3 @@ class gwnet(nn.Module):
             loss_sum += curr_loss.item()
             num_entry += num_curr_entry.item()               
         return loss_sum/num_entry
-    

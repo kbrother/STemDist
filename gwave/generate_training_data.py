@@ -93,8 +93,8 @@ def generate_train_val_test(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", type=str, default="data/METR-LA", help="Output directory.")
-    parser.add_argument("--traffic_df_filename", type=str, default="data/metr-la.h5", help="Raw traffic readings.",)
+    parser.add_argument("--output_dir", type=str, default="../data/PEMS-BAY", help="Output directory.")
+    parser.add_argument("--traffic_df_filename", type=str, default="../data/pems-bay.h5", help="Raw traffic readings.",)
     parser.add_argument("--seq_length_x", type=int, default=12, help="Sequence Length.",)
     parser.add_argument("--seq_length_y", type=int, default=12, help="Sequence Length.",)
     parser.add_argument("--y_start", type=int, default=1, help="Y pred start", )
