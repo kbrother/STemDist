@@ -12,8 +12,10 @@ from gwave_grad import GwaveGrad
 from core_set import *
 from gwave_traj import GwaveTraj
 from gwave_grad_clus import GwaveGradClus
+from save_path import SavePath
 
 
+# python gwave/train.py save_path -de 1 -se 0 -e 25 -sp params/METR-LA -mp mapping/METR-LA-20.npy -nc 20
 # python gwave/train.py ours_gc -de 3 -lr 0.01 -rr 0.001 -e 1000 -b 64 -sp results/oursgc_metrc-la_low-batch.txt
 # python gwave/train.py ours_g -lr 0.1 -rr 0.001 -e 1000 -sp results/oursg_metrc-la_lr0.1.txt
 # python gwave/train.py random -rr 0.001 -e 100 -sp results/random_metr-la_rr0.001.txt -de 3
@@ -35,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
+    parser.add_argument('-se', '--start_epochs',type=int,default=0,help='')
     parser.add_argument('-mse', '--max_start_epoch',type=int,default=25,help='')
     parser.add_argument('-ee', '--expert_epoch',type=int,default=3,help='')
     parser.add_argument('-ne', '--num_experts',type=int,default=100,help='')
@@ -54,7 +57,9 @@ if __name__ == "__main__":
     device = torch.device(f"cuda:{args.device}")
     dataloader = util.load_dataset(args.data, args.batch_size)
 
-    if args.agent == "ours_g":
+    if args.agent == "save_path":
+        _tcond = SavePath(dataloader, args, device)
+    elif args.agent == "ours_g":
         _tcond = GwaveGrad(dataloader, args, device)
     elif args.agent == "ours_gc":
         _tcond = GwaveGradClus(dataloader, args, device)
