@@ -12,7 +12,6 @@ from gwave_grad import GwaveGrad
 from core_set import *
 from gwave_traj import GwaveTraj
 from gwave_grad_clus import GwaveGradClus
-from save_path import SavePath
 
 
 # python gwave/train.py save_path -de 1 -se 0 -e 25 -sp params/METR-LA -mp mapping/METR-LA-20.npy -nc 20
