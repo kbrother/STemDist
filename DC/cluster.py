@@ -22,6 +22,7 @@ if __name__ == "__main__":
 
     # random seed setting    
     cat_data = np.load(os.path.join(args.data, 'train.npz'))
+    print(cat_data['x'].shape)
     num_nodes = cat_data['x'].shape[2]
     in_dim = cat_data['x'].shape[3]
     if args.use_embed:
@@ -55,5 +56,5 @@ if __name__ == "__main__":
     _cnt = [c/num_points for c in _cnt]        
     print(_cnt)
 
-    np.save(args.save_path, labels)
+    #np.save(args.save_path, labels)
     
