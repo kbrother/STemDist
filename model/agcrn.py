@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import util
 
 
 class AVWGCN(nn.Module):
@@ -111,7 +112,7 @@ class AGCRN(nn.Module):
 
     def forward(self, source):
         #source: B, T_1, N, D
-        #target: B, T_2, N, D
+        #target: B, T_2, N, C
         #supports = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec1.transpose(0,1))), dim=1)
         
         init_state = self.encoder.init_hidden(source.shape[0])
@@ -124,3 +125,17 @@ class AGCRN(nn.Module):
         output = output.permute(0, 1, 3, 2)                             #B, T, N, C
 
         return output
+
+    
+    def test_model(self, dataloader, scaler):
+        loss_sum, num_entry = 0, 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valx = torch.tensor(x, device=self.device, dtype=torch.float)
+            valy = torch.tensor(y, device=self.device, dtype=torch.float)
+            valy = valy[:,:,:,0]
+            output = self.forward(valx).squeeze()
+            output = scaler.inverse_transform(output)
+            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
+            loss_sum += curr_loss.item()
+            num_entry += num_curr_entry.item()               
+        return loss_sum/num_entry
