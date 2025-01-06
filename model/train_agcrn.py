@@ -40,13 +40,11 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr)
     model = model.to(device)
-    '''
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
         else:
             nn.init.uniform_(p)
-    '''
     
     for e in range(args.epochs):
         model.train()
@@ -58,8 +56,9 @@ if __name__ == "__main__":
             trainy = torch.tensor(y, device=device, dtype=torch.float)
             trainy = trainy[:,:,:,0]
             output = model(trainx).squeeze()
+            #print(output)
             output = scaler.inverse_transform(output)
-            curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)
+            curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)            
             curr_loss /= num_val_entry
 
             optimizer.zero_grad()
@@ -68,8 +67,8 @@ if __name__ == "__main__":
 
         model.eval()
         with torch.no_grad():               
-            val_mae = model.test_model(dataloader['val_loader'], scaler)
-            test_mae = model.test_model(dataloader['test_loader'], scaler)            
-            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+            val_mae = model.test_model(dataloader['val_loader'], scaler, device)
+            test_mae = model.test_model(dataloader['test_loader'], scaler, device)            
+            print(f'epoch: {e}, valid mae: {val_mae}, test mae: {test_mae}')
 
             

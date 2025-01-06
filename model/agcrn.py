@@ -127,11 +127,11 @@ class AGCRN(nn.Module):
         return output
 
     
-    def test_model(self, dataloader, scaler):
+    def test_model(self, dataloader, scaler, device):
         loss_sum, num_entry = 0, 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            valx = torch.tensor(x, device=self.device, dtype=torch.float)
-            valy = torch.tensor(y, device=self.device, dtype=torch.float)
+            valx = torch.tensor(x, device=device, dtype=torch.float)
+            valy = torch.tensor(y, device=device, dtype=torch.float)
             valy = valy[:,:,:,0]
             output = self.forward(valx).squeeze()
             output = scaler.inverse_transform(output)
