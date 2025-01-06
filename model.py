@@ -111,18 +111,6 @@ class gwnet(nn.Module):
                                     bias=True)
 
         self.receptive_field = receptive_field
-
-
-    def initialize(self):
-        for mlist in [self.filter_convs, self.gate_convs, self.skip_convs, self.gconv]:
-            for _layer in mlist:
-                _layer.reset_parameters()
-
-        self.start_conv.reset_parameters()    
-        self.nodevec1.data.copy_(torch.randn(self.num_nodes, 10))
-        self.nodevec2.data.copy_(torch.randn(10, self.num_nodes))
-        self.end_conv_1.reset_parameters()
-        self.end_conv_2.reset_parameters()
         
 
     def forward(self, input):
