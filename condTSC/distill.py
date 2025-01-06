@@ -67,7 +67,7 @@ class condTSC:
             optimizer.step()
 
             _model.eval()
-            if i%5 == 0:
+            if i%10 == 0:
                 with torch.no_grad():
                     val_loss = _model.test_model(data['val_loader'], scaler)
     
@@ -97,10 +97,10 @@ class condTSC:
         buffers = [torch.load(args.params + f"replay_buffer_{i}.pt") for i in tqdm(range(args.num_experts))]
 
     
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(args.save_path, 'a') as f:
-            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")               
+        #min_i, val_loss, test_loss = self.test_syn()
+        #print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        #with open(args.save_path, 'a') as f:
+        #    f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")               
         for i in tqdm(range(args.epochs)):
             expert_traj = buffers[np.random.randint(0, len(buffers))]
             student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
