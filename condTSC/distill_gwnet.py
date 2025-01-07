@@ -1,6 +1,6 @@
 import torch.nn as nn
 from tqdm import tqdm
-from model import gwnet
+from model.gwave import gwnet
 import torch
 import util
 import sys
@@ -160,7 +160,7 @@ class condTSC:
                     f.write(f"epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
 
 
-# python -m condTSC.distill -de 7 -e 100 -sp results/metr-la.txt
+# python -m condTSC.distill_gwnet -de 1 -e 100 -sp results/metr-la.txt -lrf 1
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
