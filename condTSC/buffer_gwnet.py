@@ -6,7 +6,7 @@ import util
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import random
-from model import *
+from model.gwave import gwnet
 import torch.optim as optim
 import math
 
