@@ -97,68 +97,78 @@ class condTSC:
         buffers = [torch.load(args.params + f"replay_buffer_{i}.pt") for i in tqdm(range(args.num_experts))]
 
     
-        #min_i, val_loss, test_loss = self.test_syn()
-        #print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        #with open(args.save_path, 'a') as f:
-        #    f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")               
+        min_i, val_loss, test_loss = self.test_syn()
+        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        with open(args.save_path, 'a') as f:
+            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")               
+        train_loss_avg = 0
+        cnt = 0
         for i in tqdm(range(args.epochs)):
+            #condition = ((i+1)%args.cond_gap) != 0 
+            condition = True
             expert_traj = buffers[np.random.randint(0, len(buffers))]
-            student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
-                               residual_channels=args.nhid, dilation_channels=args.nhid, 
-                               skip_channels=8*args.nhid, end_channels=16*args.nhid).to(self.device)  
+            if condition:
+                self.synx.requires_grad = True
+                self.syny.requires_grad = True
+                student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
+                                   residual_channels=args.nhid, dilation_channels=args.nhid, 
+                                   skip_channels=8*args.nhid, end_channels=16*args.nhid).to(self.device)  
+    
+                student_net = ReparamModule(student_net)
+                start_epoch = np.random.randint(0, args.max_start_epoch)
+                start_params = expert_traj[start_epoch]            
+                student_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0).requires_grad_(True)
+                start_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0)
+    
+                target_params = expert_traj[start_epoch + args.expert_epochs]
+                target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)            
+                param_dist = F.mse_loss(start_params, target_params, reduction="sum")
+                
+                for step in range(args.syn_steps):
+                    output_syn = student_net(synx.transpose(1, 3), flat_param=student_params).squeeze()
+                    loss_syn = util.mse(output_syn, syny)
+                    gw_syn = torch.autograd.grad(loss_syn, student_params, create_graph=True)[0]
+                    student_params = student_params - args.lr_train*gw_syn
+    
+                param_loss = F.mse_loss(student_params, target_params, reduction="sum")           
+                train_loss = param_loss / param_dist
+                train_loss_avg += train_loss.item()
+                
+                optimizer.zero_grad()
+                #optimizer_lr.zero_grad()
+                train_loss.backward()
+    
+                optimizer.step()
+                #optimizer_lr.step()
+    
+                #print(f"epoch:{i}, train loss: {grand_loss}, train loss after: {grand_loss_after}")
+                print(f"epoch:{i}, train loss: {train_loss}")
+                cnt += 1
+            else:
+                self.synx.requires_grad = False
+                self.syny.requires_grad = False
+                target_params = expert_traj[-1]
+                target_params = torch.cat([p.data.clone().reshape(-1).to(args.device) for p in target_params], 0)
+                student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
+                                   residual_channels=args.nhid, dilation_channels=args.nhid, 
+                                   skip_channels=8*args.nhid, end_channels=16*args.nhid).to(self.device)  
+                student_net = ReparamModule(student_net)
+                student_net.eval()
 
-            student_net = ReparamModule(student_net)
-            start_epoch = np.random.randint(0, args.max_start_epoch)
-            start_params = expert_traj[start_epoch]            
-            student_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0).requires_grad_(True)
-            start_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0)
-
-            target_params = expert_traj[start_epoch + args.expert_epochs]
-            target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)            
-            param_dist = F.mse_loss(start_params, target_params, reduction="sum")
+                with torch.no_grad():
+                    output_syn = student_net(synx.transpose(1, 3), flat_param=target_params).squeeze()
+                    self.syny.data[:, :] = (1-args.beta)*self.syny.data + args.beta*output_syn
             
-            for step in range(args.syn_steps):
-                output_syn = student_net(synx.transpose(1, 3), flat_param=student_params).squeeze()
-                loss_syn = util.mse(output_syn, syny)
-                gw_syn = torch.autograd.grad(loss_syn, student_params, create_graph=True)[0]
-                student_params = student_params - args.lr_train*gw_syn
-
-            param_loss = F.mse_loss(student_params, target_params, reduction="sum")           
-            grand_loss = param_loss / param_dist
-
-            optimizer.zero_grad()
-            #optimizer_lr.zero_grad()
-            grand_loss.backward()
-
-            optimizer.step()
-            #optimizer_lr.step()
-
-            # For checking the reudction of training loss
-            '''
-            start_params = expert_traj[start_epoch]
-            target_params = expert_traj[start_epoch + args.expert_epoch]
-            target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)
-            student_params = [torch.cat([p.data.to(self.device).reshape(-1) for p in start_params], 0).requires_grad_(True)]
-            start_params = torch.cat([p.data.to(self.device).reshape(-1) for p in start_params], 0)
-
-            for step in range(args.syn_steps):
-                output_syn = student_net(synx.transpose(1, 3), flat_param=student_params[-1]).squeeze()
-                loss_syn = util.mse(output_syn, syny)
-                gw_syn = torch.autograd.grad(loss_syn, student_params[-1])[0]
-                student_params.append(student_params[-1] - syn_lr*gw_syn)
-
-            param_loss = F.mse_loss(student_params[-1], target_params, reduction="sum")
-            param_dist = F.mse_loss(start_params, target_params, reduction="sum")
-            grand_loss_after = param_loss / param_dist
-            '''    
-            #print(f"epoch:{i}, train loss: {grand_loss}, train loss after: {grand_loss_after}")
-            print(f"epoch:{i}, train loss: {grand_loss}")
+            
             if (i+1)%10== 0:
                 min_i, val_loss, test_loss = self.test_syn()
-                print(f"epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+                print(f"epoch: {i}, min i: {min_i}, train loss: {train_loss_avg/cnt}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path, 'a') as f:
-                    f.write(f"epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
+                    f.write(f"epoch: {i}, min i: {min_i}, train loss: {train_loss_avg/cnt}, val loss: {val_loss}, test loss: {test_loss}\n")
+                train_loss_avg = 0
+                cnt = 0
 
+            
 
 # python -m condTSC.distill_gwnet -de 1 -e 100 -sp results/metr-la.txt -lrf 1
 if __name__ == "__main__":
@@ -180,6 +190,8 @@ if __name__ == "__main__":
     parser.add_argument('-mse', '--max_start_epoch', type=int, default=4, help='max epoch we can start at')
     parser.add_argument('-ss', '--syn_steps', type=int, default=20, help='how many steps to take on synthetic data')
     parser.add_argument('-ee', '--expert_epochs', type=int, default=2, help='how many expert epochs the target params are')
+    parser.add_argument('--cond_gap', type=int, default=3, help='Epoch gap of using CondTSF')
+    parser.add_argument('--beta', type=float, default=0.01, help='CondTSF addtive ratio')
     args = parser.parse_args()
     
     # random seed setting
