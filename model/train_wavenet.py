@@ -5,23 +5,21 @@ import time
 import util
 from tqdm import tqdm
 import random
-from model import *
+from model.gwave import gwnet
 import torch.optim as optim
 import math
 
 
-# python gwave/train_wavenet.py -de 0 -lr 1e-2
-# python gwave/train_wavenet.py -de 5 -d ../data/PEMS-BAY
+# python -m model.train_wavenet -de 0 -d ../data/METR-LA-Tensor -lr 1e-2 -e 100
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
-    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
-    parser.add_argument('-wd', '--weight_decay',type=float,default=0.0001,help='weight decay rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     args = parser.parse_args()
@@ -44,8 +42,8 @@ if __name__ == "__main__":
     model.to(device)
     #model.reset_parameters()
     
-    _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-    for i in tqdm(range(args.epochs)):
+    _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    for i in range(args.epochs):
 
         model.train()
         dataloader['train_loader'].shuffle()

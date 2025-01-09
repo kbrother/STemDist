@@ -3,7 +3,6 @@ import numpy as np
 import argparse
 import time
 import util
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import random
 from model.gwave import gwnet
@@ -11,21 +10,21 @@ import torch.optim as optim
 import math
 
 
-# python -m condTSC.buffer -de 5 -lr 1e-3 -s 0
-# python -m condTSC.buffer -de 7 -lr 1e-3 -s 1
-# python -m condTSC.buffer -de 3 -lr 1e-3 -s 2
-# python -m condTSC.buffer -de 5 -lr 1e-3 -s 3
+# python -m condTSC.buffer -de 4 -lr 1e-3 -s 0
+# python -m condTSC.buffer -de 5 -lr 1e-3 -s 1
+# python -m condTSC.buffer -de 6 -lr 1e-3 -s 2
+# python -m condTSC.buffer -de 7 -lr 1e-3 -s 3
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
-    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-b', '--batch_size', type=int, default=2**6, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=10,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
-    parser.add_argument('-sp', '--save_path', type=str, default='../data/params/METR-LA/')
+    parser.add_argument('-sp', '--save_path', type=str, default='../data/params/METR-LA-Tensor/')
     parser.add_argument('-ne', '--num_experts', type=int, default=10)
     parser.add_argument('-m', '--mom', type=float, default=0.9, help='momentum')
     args = parser.parse_args()
@@ -50,7 +49,7 @@ if __name__ == "__main__":
         model.to(device)
         #model.reset_parameters()
 
-        curr_traj = [[p.detach().cpu() for p in model.parameters()]]        
+        curr_traj = [[p.detach().clone().cpu() for p in model.parameters()]]        
         _optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.mom)
         for i in range(args.epochs):
             model.train()
@@ -78,6 +77,6 @@ if __name__ == "__main__":
                 with open(args.save_path + f"replay_buffer_{args.num_experts*args.seed + it}.txt", "a") as f:
                     f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
 
-            curr_traj.append([p.detach().cpu() for p in model.parameters()])        
+            curr_traj.append([p.detach().clone().cpu() for p in model.parameters()])        
         torch.save(curr_traj, args.save_path + f"replay_buffer_{args.num_experts*args.seed + it}.pt")
         

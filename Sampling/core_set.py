@@ -4,9 +4,10 @@ import copy
 import sys
 import util
 import random
-from model import gwnet
+from model.gwave import gwnet
 from tqdm import tqdm
 import numpy as np
+import argparse
 
 
 class Coreset:
@@ -27,23 +28,24 @@ class Coreset:
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
-        _model = gwnet(self.device, num_nodes, args.dropout, in_dim, args.seq_length, 
+        _model = gwnet(self.device, num_nodes, 0.3, in_dim, 12, 
                            residual_channels=args.nhid, dilation_channels=args.nhid, 
                            skip_channels=8*args.nhid, end_channels=16*args.nhid)
         _model.to(self.device)
-        optimizer = torch.optim.Adam(_model.parameters(), lr=1e-4, weight_decay=0.0001)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
         for i in tqdm(range(200)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
-            loss_syn = util.mse(output_syn, syny)
+            loss_syn, num_val_entry = util.masked_se(output_syn, syny, 0.)
+            loss_syn /= num_val_entry
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
 
             _model.eval()
-            if (i+1)%20 == 0:
+            if (i+1)%10 == 0:
                 with torch.no_grad():
                     val_loss = _model.test_model(data['val_loader'], scaler)
     
@@ -70,80 +72,38 @@ class RandomSample(Coreset):
         self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
-    
-
-    def train(self):
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(self.args.save_path, 'a') as f:
-            f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
-
-
-def get_cluster(vecs, num_cents, device):
-    num_entry = vecs.shape[0]
-    vecs = vecs.reshape(num_entry, -1)    
-    _mean = np.mean(vecs, axis=0)
-    _std = np.std(vecs, axis=0)
-    vecs = (vecs - _mean) / _std
-
-    torch_vecs = torch.tensor(vecs, device=device)
-    centroids = 2*(np.random.rand(num_cents, vecs.shape[1]) - 0.5)    
-    for i in tqdm(range(80)):
-        curr_dist = torch.zeros((num_cents, num_entry), device=device)
-        torch_centroids = torch.tensor(centroids, device=device)
-        for j in range(num_cents):
-            curr_dist[j, :] = torch.sum(torch.square(torch_centroids[j] - torch_vecs), dim=1)
-
-        curr_dist = curr_dist.cpu().numpy()
-        curr_dist = curr_dist.transpose()
-        mapping = np.argmin(curr_dist, axis=1)
-        #if (i+1)%1 == 0:
-        #    print(np.sum(np.min(curr_dist,axis=1)))
-
-        _cnt = [0 for _ in range(num_cents)]
-        centroids = np.zeros((num_cents, vecs.shape[1]))
-        for j in range(num_entry):
-            centroids[mapping[j]] += vecs[j]
-            _cnt[mapping[j]] += 1
-        
-        for j in range(num_cents):
-            centroids[j] /= _cnt[j]
-
-    return mapping
-    
-
-class Kmeans(Coreset):
-    def __init__(self, data, args, device):
-        super().__init__(data, args, device)
-        xs = data['train_loader'].xs
-        ys = data['train_loader'].ys[...,0]
-        
-        num_total = xs.shape[0]
-        mapping = get_cluster(ys, self.num_elems, device)
-
-        _shape = [self.num_elems] + list(xs.shape[1:])
-        self.synx = np.zeros(_shape)
-        _shape = [self.num_elems] + list(ys.shape[1:])
-        self.syny = np.zeros(_shape)
-
-        _cnt = [0 for _ in range(self.num_elems)]
-        for i in range(num_total):
-            self.synx[mapping[i]] += xs[i]
-            self.syny[mapping[i]] += ys[i]
-            _cnt[mapping[i]] += 1
-
-        for i in range(self.num_elems):
-            if _cnt[i] > 0:
-                self.synx[i] /= _cnt[i]
-                self.syny[i] /= _cnt[i]
-
-        self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
-        self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
-
+        print(f'x: {self.synx.shape}, y:{self.syny.shape}')
     
     def train(self):
         min_i, val_loss, test_loss = self.test_syn()
         print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
         with open(self.args.save_path, 'a') as f:
             f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
- 
+
+
+# python -m Sampling.core_set -d PEMS-BAY -de 0 -s 0 -lr 1e-2 -r 3e-4
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-de', '--device', type=int, default=0, help='')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
+    parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-r', '--reduction_rate',type=float,default=1e-3,help='learning rate')
+    parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**6, help='batch size')
+    parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
+    args = parser.parse_args()
+
+    # random seed setting
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+
+    device = torch.device(f"cuda:{args.device}")
+    dataloader = util.load_dataset(args.data, args.batch_size)
+    print("load finish")
+
+    _model = RandomSample(dataloader, args, device)
+    min_i, min_val_loss, test_loss = _model.test_syn()
+    print(f"min i: {min_i}, min val loss: {min_val_loss}, test loss: {test_loss}")
+    

@@ -80,7 +80,8 @@ def load_dataset(dataset_dir, batch_size):
         data['x_' + category] = cat_data['x']
         data['y_' + category] = cat_data['y']
     scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
-    
+
+    print(data['x_train'].shape)
     # Data format
     for category in ['train', 'val', 'test']:
         data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])

@@ -26,16 +26,6 @@ class condTSC:
         _shape = [self.num_elems] + list(data['train_loader'].ys.shape[1:-1])
         self.syny = torch.rand(_shape, device=device, dtype=torch.float)
 
-        '''
-        num_total = data['train_loader'].xs.shape[0]
-        sampled_idx = random.sample(list(range(num_total)), self.num_elems)
-        self.synx = self.data['train_loader'].xs[sampled_idx]     
-        self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
-        
-        self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
-        self.syny = scaler.transform(self.syny)
-        self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
-                '''        
         self.synx = nn.Parameter(self.synx)
         self.syny = nn.Parameter(self.syny)
         
@@ -67,7 +57,7 @@ class condTSC:
             optimizer.step()
 
             _model.eval()
-            if i%10 == 0:
+            if (i+1)%10 == 0:
                 with torch.no_grad():
                     val_loss = _model.test_model(data['val_loader'], scaler)
     
@@ -96,69 +86,73 @@ class condTSC:
         optimizer = torch.optim.Adam([synx, syny], lr=args.lr_feat)
         buffers = [torch.load(args.params + f"replay_buffer_{i}.pt") for i in tqdm(range(args.num_experts))]
 
-    
+
+        '''
         min_i, val_loss, test_loss = self.test_syn()
         print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
         with open(args.save_path, 'a') as f:
             f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")               
+        '''
         train_loss_avg = 0
         cnt = 0
         for i in tqdm(range(args.epochs)):
             #condition = ((i+1)%args.cond_gap) != 0 
             condition = True
             expert_traj = buffers[np.random.randint(0, len(buffers))]
+            student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length,                                 
+                                residual_channels=args.nhid, dilation_channels=args.nhid, 
+                                skip_channels=8*args.nhid,
+                                end_channels=16*args.nhid).to(self.device)      
+            student_net = ReparamModule(student_net)
+            student_net.train()
+            start_epoch = np.random.randint(0, args.max_start_epoch)
+
             if condition:
                 self.synx.requires_grad = True
-                self.syny.requires_grad = True
-                student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
-                                   residual_channels=args.nhid, dilation_channels=args.nhid, 
-                                   skip_channels=8*args.nhid, end_channels=16*args.nhid).to(self.device)  
-    
-                student_net = ReparamModule(student_net)
-                start_epoch = np.random.randint(0, args.max_start_epoch)
-                start_params = expert_traj[start_epoch]            
-                student_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0).requires_grad_(True)
-                start_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0)
-    
-                target_params = expert_traj[start_epoch + args.expert_epochs]
-                target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)            
-                param_dist = F.mse_loss(start_params, target_params, reduction="sum")
-                
-                for step in range(args.syn_steps):
-                    output_syn = student_net(synx.transpose(1, 3), flat_param=student_params).squeeze()
-                    loss_syn = util.mse(output_syn, syny)
-                    gw_syn = torch.autograd.grad(loss_syn, student_params, create_graph=True)[0]
-                    student_params = student_params - args.lr_train*gw_syn
-    
-                param_loss = F.mse_loss(student_params, target_params, reduction="sum")           
-                train_loss = param_loss / param_dist
-                train_loss_avg += train_loss.item()
-                
-                optimizer.zero_grad()
-                #optimizer_lr.zero_grad()
-                train_loss.backward()
-    
-                optimizer.step()
-                #optimizer_lr.step()
-    
-                #print(f"epoch:{i}, train loss: {grand_loss}, train loss after: {grand_loss_after}")
-                print(f"epoch:{i}, train loss: {train_loss}")
-                cnt += 1
+                self.syny.requires_grad = True                
             else:
                 self.synx.requires_grad = False
-                self.syny.requires_grad = False
-                target_params = expert_traj[-1]
-                target_params = torch.cat([p.data.clone().reshape(-1).to(args.device) for p in target_params], 0)
-                student_net = gwnet(self.device, num_nodes, 0.3, in_dim, args.seq_length, 
-                                   residual_channels=args.nhid, dilation_channels=args.nhid, 
-                                   skip_channels=8*args.nhid, end_channels=16*args.nhid).to(self.device)  
-                student_net = ReparamModule(student_net)
-                student_net.eval()
+                self.syny.requires_grad = False               
 
-                with torch.no_grad():
-                    output_syn = student_net(synx.transpose(1, 3), flat_param=target_params).squeeze()
-                    self.syny.data[:, :] = (1-args.beta)*self.syny.data + args.beta*output_syn
-            
+            for multi_step in range(2):
+                if condition:
+                    start_params = expert_traj[start_epoch]            
+                    student_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0).requires_grad_(True)
+                    start_params = torch.cat([p.data.clone().to(self.device).reshape(-1) for p in start_params], 0)
+        
+                    target_params = expert_traj[start_epoch + args.expert_epochs]
+                    target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)            
+                    param_dist = F.mse_loss(start_params, target_params, reduction="sum")
+                    
+                    for step in range(args.syn_steps):
+                        output_syn = student_net(synx.transpose(1, 3), flat_param=student_params).squeeze()
+                        loss_syn = util.mse(output_syn, syny)
+                        gw_syn = torch.autograd.grad(loss_syn, student_params, create_graph=True)[0]
+                        student_params = student_params - args.lr_train*gw_syn
+        
+                    param_loss = F.mse_loss(student_params, target_params, reduction="sum")           
+                    train_loss = param_loss / param_dist
+                    train_loss_avg += train_loss.item()
+                    
+                    optimizer.zero_grad()
+                    #optimizer_lr.zero_grad()
+                    train_loss.backward()
+        
+                    optimizer.step()
+                    #optimizer_lr.step()
+        
+                    #print(f"epoch:{i}, train loss: {grand_loss}, train loss after: {grand_loss_after}")
+                    #print(f"epoch:{i}, train loss: {train_loss}")
+                    cnt += 1
+                else:
+                    target_params = expert_traj[-1]
+                    target_params = torch.cat([p.data.clone().reshape(-1).to(args.device) for p in target_params], 0)     
+                    student_net.eval()
+    
+                    with torch.no_grad():
+                        output_syn = student_net(synx.transpose(1, 3), flat_param=target_params).squeeze()
+                        self.syny.data[:, :] = (1-args.beta)*self.syny.data + args.beta*output_syn
+                
             
             if (i+1)%10== 0:
                 min_i, val_loss, test_loss = self.test_syn()
@@ -168,26 +162,25 @@ class condTSC:
                 train_loss_avg = 0
                 cnt = 0
 
-            
 
-# python -m condTSC.distill_gwnet -de 1 -e 100 -sp results/metr-la.txt -lrf 1
+# python -m condTSF.distill_gwnet -de 1 -e 100 -sp results/metr-la.txt -lrf 0.5 -lrs 1e-3 -lrt 1e-3
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
-    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
     parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**6, help='batch size')
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-4,help='learning rate')
-    parser.add_argument('-r', '--reduction_rate',type=float,default=1e-3,help='learning rate')
+    parser.add_argument('-r', '--reduction_rate',type=float,default=3e-4,help='learning rate')
     parser.add_argument('-lrt', '--lr_train',type=float,default=1e-4,help='learning rate')
     parser.add_argument('-lrf', '--lr_feat',type=float,default=0.1,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
-    parser.add_argument('-p', '--params', type=str, default='../data/params/METR-LA/')
+    parser.add_argument('-p', '--params', type=str, default='../data/params/METR-LA-Tensor1/')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-ne', '--num_experts', type=int, default=40)
-    parser.add_argument('-mse', '--max_start_epoch', type=int, default=4, help='max epoch we can start at')
+    parser.add_argument('-mse', '--max_start_epoch', type=int, default=8, help='max epoch we can start at')
     parser.add_argument('-ss', '--syn_steps', type=int, default=20, help='how many steps to take on synthetic data')
     parser.add_argument('-ee', '--expert_epochs', type=int, default=2, help='how many expert epochs the target params are')
     parser.add_argument('--cond_gap', type=int, default=3, help='Epoch gap of using CondTSF')
