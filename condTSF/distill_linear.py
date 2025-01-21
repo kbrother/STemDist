@@ -1,6 +1,6 @@
 import torch.nn as nn
 from tqdm import tqdm
-from model.glinear import GLinear
+from model.linear import Linear
 import torch
 import util
 import sys
@@ -42,7 +42,7 @@ class condTSC:
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
-        _model = GLinear(args, in_dim)
+        _model = Linear(args, in_dim)
         _model.to(self.device)
         
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
@@ -95,7 +95,7 @@ class condTSC:
         cnt = 0
         for i in tqdm(range(args.epochs)):
             expert_traj = buffers[np.random.randint(0, len(buffers))]
-            student_net = GLinear(args, in_dim).to(self.device)                  
+            student_net = Linear(args, in_dim).to(self.device)                  
             student_net = ReparamModule(student_net)
             student_net.train()
             start_epoch = np.random.randint(0, args.max_start_epoch + 1)

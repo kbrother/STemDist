@@ -1,6 +1,6 @@
 import argparse
 import util
-from model.glinear import GLinear
+from model.linear import Linear
 import torch.nn.functional as F
 import torch.nn as nn
 from tqdm import tqdm
@@ -10,7 +10,7 @@ import numpy as np
 import sys
 
 
-# python -m model.train_glinear -de 0 -lr 0.01 -e 30
+# python -m model.train_linear -de 0 -lr 0.01 -e 30
 if __name__ == "__main__":
     torch.set_num_threads(4)
     args = argparse.ArgumentParser(description='arguments')
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
-    model = GLinear(args, in_dim)
+    model = Linear(args, in_dim)
     #init loss function, optimizer    
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr)

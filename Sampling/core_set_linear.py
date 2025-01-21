@@ -4,7 +4,7 @@ import copy
 import sys
 import util
 import random
-from model.glinear import GLinear
+from model.linear import Linear
 from tqdm import tqdm
 import numpy as np
 import argparse
@@ -28,7 +28,7 @@ class Coreset:
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
-        _model = GLinear(args, in_dim)
+        _model = Linear(args, in_dim)
         _model.to(self.device)
         for p in _model.parameters():
             if p.dim() > 1:

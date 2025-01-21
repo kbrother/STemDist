@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import util
 
 
-class GLinear(nn.Module):
+class Linear(nn.Module):
 
     def __init__(self, args, input_dim):
         super(GLinear,self).__init__()        
