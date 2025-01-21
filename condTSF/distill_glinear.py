@@ -139,7 +139,7 @@ class condTSC:
                 cnt = 0
 
 
-# python -m condTSF.distill_glinear -de 0 -e 100 -sp results/metr-la.txt -lrf 0.01 -lrs 3e-3 -lrt 3e-3
+# python -m condTSF.distill_glinear -de 0 -e 1000 -sp results/metr-la.txt -lrf 0.01 -lrs 3e-3 -lrt 3e-3
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

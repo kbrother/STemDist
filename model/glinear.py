@@ -14,6 +14,7 @@ class GLinear(nn.Module):
         self.end_conv = nn.Conv2d(self.input_len, self.output_len, (1, args.rnn_units))
         self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, args.embed_dim), requires_grad=True)
         self.linear = nn.Linear(input_dim, args.rnn_units)
+        self.linear2 = nn.Linear(args.rnn_units, args.rnn_units)
     
 
     def forward(self, source):
@@ -22,8 +23,10 @@ class GLinear(nn.Module):
 
         supports = F.softmax(torch.mm(self.node_embeddings, self.node_embeddings.transpose(0, 1)), dim=1)
         AX = torch.einsum('nm,btmd->btnd', supports, source)   # B, T_1, N, dim_in
-        AXW = torch.sigmoid(self.linear(AX))  # B, T_1, N, h
-        output = self.end_conv(AXW)  # B, T_2, N
+        AXW = torch.relu(self.linear(AX))  # B, T_1, N, h
+        h = torch.einsum('nm,btmh->btnh', supports, AXW)   # B, T_1, N, h
+        h = torch.relu(self.linear2(h))
+        output = self.end_conv(h)  # B, T_2, N
         return output.squeeze()
 
     
