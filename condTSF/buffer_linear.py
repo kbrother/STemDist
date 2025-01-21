@@ -5,7 +5,7 @@ import time
 import util
 from tqdm import tqdm
 import random
-from model.glinear import GLinear
+from model.glinear import Linear
 import torch.optim as optim
 import math
 import torch.nn as nn
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     in_dim = dataloader['train_loader'].xs.shape[3]
 
     for it in range(args.num_experts):
-        model = GLinear(args, in_dim)
+        model = Linear(args, in_dim)
         model = model.to(device)        
         curr_traj = [[p.clone().detach().cpu() for p in model.parameters()]]        
         _optimizer = optim.Adam(model.parameters(), lr=args.lr)
