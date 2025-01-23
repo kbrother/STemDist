@@ -55,7 +55,7 @@ class gcn(nn.Module):
         
 
 class gwnet(nn.Module):
-    def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12, residual_channels=32, dilation_channels=32, skip_channels=256, end_channels=512, blocks=4,layers=2):
+    def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12, residual_channels=32, dilation_channels=32, skip_channels=256, end_channels=512, blocks=4,layers=2, node_vec=None):
         super(gwnet, self).__init__()
         self.dropout = dropout
         self.blocks = blocks
@@ -74,8 +74,15 @@ class gwnet(nn.Module):
         receptive_field = 1
         self.device = device
         self.num_nodes = num_nodes
-        self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
-        self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
+
+        if node_vec is None:
+            self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
+            self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
+        else:
+            self.nodevec1 = nn.Parameter(node_vec)
+            self.nodevec2 = nn.Parameter(node_vec.T)
+            #self.nodevec1 = node_vec.to(device)
+            #self.nodevec2 = node_vec.T.to(device)
 
         for b in range(blocks):
             new_dilation = 1       

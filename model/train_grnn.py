@@ -1,6 +1,6 @@
 import argparse
 import util
-from model.glinear import GLinear
+from model.grnn import GRNN
 import torch.nn.functional as F
 import torch.nn as nn
 from tqdm import tqdm
@@ -10,7 +10,7 @@ import numpy as np
 import sys
 
 
-# python -m model.train_glinear -de 0 -lr 0.01 -e 50
+# python -m model.train_grnn -de 0 -lr 0.01 -e 50
 if __name__ == "__main__":
     torch.set_num_threads(4)
     args = argparse.ArgumentParser(description='arguments')
@@ -38,19 +38,16 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
-    model = GLinear(args, num_nodes, in_dim)
+    model = GRNN(args, num_nodes, in_dim)
     #init loss function, optimizer    
-
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr)
-    model = model.to(device)
-    '''
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
         else:
             nn.init.uniform_(p)
-    '''
-    
+
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr)
+    model = model.to(device)
     min_val_mse = sys.float_info.max
     for e in range(args.epochs):
         model.train()
