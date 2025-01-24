@@ -9,8 +9,7 @@ class AVWGCN(nn.Module):
         super(AVWGCN, self).__init__()
         self.cheb_k = cheb_k
         #self.weights_pool = nn.Parameter(torch.FloatTensor(embed_dim, cheb_k, dim_in, dim_out))
-        #self.bias_pool = nn.Parameter(torch.FloatTensor(embed_dim, dim_out))
-        #self.weights_pool = nn.Parameter(torch.FloatTensor(embed_dim, cheb_k, dim_in, dim_out))
+        #self.bias_pool = nn.Parameter(torch.FloatTensor(embed_dim, dim_out))        
         self.weights = nn.Parameter(torch.FloatTensor(cheb_k, dim_in, dim_out))
         self.bias = nn.Parameter(torch.FloatTensor(dim_out))
   

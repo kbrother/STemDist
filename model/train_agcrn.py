@@ -8,7 +8,7 @@ import random
 import torch
 import numpy as np
 
-# python -m model.train_agcrn -de 7 -lr 0.001
+# python -m model.train_agcrn -de 0 -lr 0.01
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('-de', '--device', type=int, default=0, help='')
