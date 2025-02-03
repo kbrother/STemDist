@@ -89,7 +89,7 @@ class RandomSample(Coreset):
 
 
 # python -m Sampling.core_set_mtgnn -de 0 -s 0 -lr 1e-2 -r 1e-3
-# python -m Sampling.core_set_gwave -d PEMS-BAY -de 0 -s 0 -lr 1e-2 -r 3e-4
+# python -m Sampling.core_set_mtgnn -d ../data/PEMS-BAY -de 4 -s 0 -lr 1e-2 -r 3e-4
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')

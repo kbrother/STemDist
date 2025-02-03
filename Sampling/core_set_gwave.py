@@ -34,7 +34,7 @@ class Coreset:
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
-        for i in tqdm(range(100)):
+        for i in tqdm(range(300)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
@@ -84,7 +84,7 @@ class RandomSample(Coreset):
 
 
 # python -m Sampling.core_set_gwave -de 0 -s 0 -lr 1e-2 -r 1e-3
-# python -m Sampling.core_set_gwave -d PEMS-BAY -de 0 -s 0 -lr 1e-2 -r 3e-4
+# python -m Sampling.core_set_gwave -d ../data/PEMS-BAY -de 4 -s 0 -lr 1e-2 -r 3e-4
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')

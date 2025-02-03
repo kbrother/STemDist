@@ -38,7 +38,7 @@ class Coreset:
     
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max
-        for i in tqdm(range(200)):
+        for i in tqdm(range(250)):
             _model.train()
             output_syn = _model(synx).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
@@ -86,7 +86,8 @@ class RandomSample(Coreset):
             f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
 
 
-# python -m Sampling.core_set_agcrn -d ../data/METR-LA -de 0 -s 0 -lr 1e-2 -r 1e-3
+# python -m Sampling.core_set_agcrn -d ../data/METR-LA -de 3 -s 0 -lr 1e-2 -r 1e-3
+# python -m Sampling.core_set_agcrn -d ../data/PEMS-BAY -de 0 -s 0 -lr 1e-3 -r 3e-4
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')

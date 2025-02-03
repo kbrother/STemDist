@@ -8,8 +8,10 @@ import random
 import torch
 import numpy as np
 
-# python -m model.train_agcrn -de 0 -lr 0.01
+# python -m model.train_agcrn -de 0 -d ../data/METR-LA -lr 0.01
+# python -m model.train_agcrn -de 1 -d ../data/PEMS-BAY -lr 0.01
 if __name__ == "__main__":
+    torch.set_num_threads(4)
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('-de', '--device', type=int, default=0, help='')
     args.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')

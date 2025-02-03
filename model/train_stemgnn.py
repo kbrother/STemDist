@@ -10,7 +10,8 @@ import torch.optim as optim
 import math
 
 
-# python -m model.train_stemgnn -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_stemgnn -de 3 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_stemgnn -de 2 -d ../data/PEMS-BAY -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

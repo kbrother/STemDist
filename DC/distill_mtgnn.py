@@ -63,7 +63,7 @@ class GradMatch:
                   seq_length=12, in_dim=in_dim, out_dim=12,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)   
         _model.to(self.device)
-        optimizer = torch.optim.Adam(_model.parameters(), lr=3e-3)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max
         for i in tqdm(range(300)):
             _model.train()
@@ -174,12 +174,13 @@ class GradMatch:
                     syny_ = syny.detach().clone().cpu()
                     node1 = _model.gc.emb1.weight.detach().clone().cpu()
                     node2 = _model.gc.emb2.weight.detach().clone().cpu()
-                    #torch.save({'x':synx, 'y':syny, 'node1': node1, 'node2': node2}, args.save_path + ".pt")
+                    torch.save({'x':synx, 'y':syny, 'node1': node1, 'node2': node2}, args.save_path + ".pt")
             else:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
             
 # python -m DC.distill_mtgnn -de 0 -e 100 -sp results/dc_gwave.txt -lrf 0.01 -lrs 0.01 -r 1e-3
+# python -m DC.distill_mtgnn -de 6 -d ../data/PEMS-BAY -e 1000 -sp results/dc_pems_mtgnn2 -lrf 0.001 -lrs 0.001 -r 3e-4
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

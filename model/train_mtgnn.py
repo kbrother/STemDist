@@ -10,7 +10,8 @@ import torch.optim as optim
 import math
 
 
-# python -m model.train_mtgnn -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn -de 1 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn -d ../data/PEMS-BAY -de 0 -lr 1e-3 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -71,4 +72,4 @@ if __name__ == "__main__":
         with torch.no_grad():               
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)            
-            print(f'epoch: {i}, valid mse: {val_mae}, test mse: {test_mae}')
+            print(f'epoch: {i}, valid mse: {val_mse}, test mse: {test_mse}')

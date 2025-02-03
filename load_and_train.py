@@ -19,6 +19,7 @@ def test_gwnet(args, data, synx, syny, node_embed1, node_embed2, device):
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
+    '''
     _model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, 
                    residual_channels=args.nhid, dilation_channels=args.nhid, 
                    skip_channels=8*args.nhid, end_channels=16*args.nhid, node_vec1=node_embed1, node_vec2=node_embed2)
@@ -26,7 +27,6 @@ def test_gwnet(args, data, synx, syny, node_embed1, node_embed2, device):
     _model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, 
                    residual_channels=args.nhid, dilation_channels=args.nhid, 
                    skip_channels=8*args.nhid, end_channels=16*args.nhid)
-    '''
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
@@ -61,12 +61,13 @@ def test_agcrn(args, data, synx, syny, node_embed, device):
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
-    _model = AGCRN(args, num_nodes, in_dim, node_embed)
-    #_model = AGCRN(args, num_nodes, in_dim)
+    #_model = AGCRN(args, num_nodes, in_dim, node_embed)
+    _model = AGCRN(args, num_nodes, in_dim)
+    
     for p in _model.parameters():
-        if p.shape == (num_nodes, args.embed_dim):
-            print("here")
-            continue
+        #if p.shape == (num_nodes, args.embed_dim):
+        #    print("here")
+        #    continue
             
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -156,7 +157,7 @@ def test_stemgnn(args, data, synx, syny, node_embed, device):
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-    for i in tqdm(range(300)):
+    for i in tqdm(range(500)):
         _model.train()
         output_syn, _ = _model(synx[:,:,:,0])
         loss_syn = F.mse_loss(output_syn, syny)
@@ -183,7 +184,51 @@ def test_stemgnn(args, data, synx, syny, node_embed, device):
     print(f'test :{test_loss}')
 
 
-# python -m load_and_train -de 1 -lrs 1e-3 -lp results/dc_mtgnn.pt
+def test_mtgnn(args, data, synx, syny, device):
+    num_nodes = data['train_loader'].xs.shape[2]
+    in_dim = data['train_loader'].xs.shape[3]
+    scaler = data['scaler']
+    _model = gtnet(True, True, 2, num_nodes,
+                  device, predefined_A=None,
+                  dropout=0.3, subgraph_size=20,
+                  node_dim=10, dilation_exponential=1,
+                  conv_channels=32, residual_channels=32,
+                  skip_channels=64, end_channels=128,
+                  seq_length=12, in_dim=in_dim, out_dim=12,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True) 
+    
+    _model.to(device)
+    optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
+    min_val_loss = sys.float_info.max
+    for i in tqdm(range(300)):
+        _model.train()
+        output_syn = _model(synx.transpose(1,3)).squeeze()
+        loss_syn = F.mse_loss(output_syn, syny)
+        optimizer.zero_grad()
+        loss_syn.backward()
+        optimizer.step()
+
+        _model.eval()
+        if (i+1)%10 == 0:
+            with torch.no_grad():
+                val_loss = _model.test_model(data['val_loader'], scaler, device)
+
+            if min_val_loss > val_loss:
+                min_i = i
+                min_val_loss = val_loss
+                min_params = copy.deepcopy(_model.state_dict())
+            print(f'min i: {min_i}, val: {val_loss}')
+
+    _model.load_state_dict(min_params)
+    _model.eval()
+    with torch.no_grad():
+        test_loss = _model.test_model(data['test_loader'], scaler, device)
+
+    print(f'test :{test_loss}')
+
+
+# python -m load_and_train -de 3 -lrs 1e-3 -lp results/dc_mtgnn.pt
+# python -m load_and_train -de 4 -d ../data/PEMS-BAY -lrs 1e-3 -lp results/dc_pems_mtgnn4.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -220,6 +265,6 @@ if __name__ == "__main__":
     print(syny.shape)
     
     #test_gwnet(args, dataloader, synx, syny, node_embed1, node_embed2, device)
-    #test_agcrn(args, dataloader, synx, syny, node_embed1, device)
-    test_stemgnn(args, dataloader, synx, syny, node_embed1, device)
-    #test_mtgnn(args, dataloader, synx, syny, node_embed, device)
+    test_agcrn(args, dataloader, synx, syny, node_embed1, device)
+    #test_stemgnn(args, dataloader, synx, syny, node_embed1, device)
+    #test_mtgnn(args, dataloader, synx, syny, device)

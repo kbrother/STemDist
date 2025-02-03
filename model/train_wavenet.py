@@ -10,8 +10,10 @@ import torch.optim as optim
 import math
 
 
-# python -m model.train_wavenet -de 0 -d ../data/METR-LA-Tensor -lr 1e-2 -e 100
+# python -m model.train_wavenet -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_wavenet -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100
 if __name__ == "__main__":
+    torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
