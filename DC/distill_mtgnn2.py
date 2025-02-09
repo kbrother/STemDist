@@ -62,7 +62,7 @@ class GradMatch:
 
         _optimizer = optim.Adam(self.trained_model.parameters(), lr=0.01)
         min_val_mse = sys.float_info.max
-        for i in range(10):
+        for i in range(20):
     
             self.trained_model.train()
             self.data['train_loader'].shuffle()
@@ -225,14 +225,14 @@ class GradMatch:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
             
-# python -m DC.distill_mtgnn2 -de 1 -e 300 -sp results/dc_mtgnn2_3e-3_lr1e-2 -lrf 1e-2 -lrs 0.01 -r 3e-3
+# python -m DC.distill_mtgnn2 -de 1 -e 300 -sp results/dc_mtgnn2_4e-3 -lrf 1e-2 -lrs 0.01 -r 4e-3
 # python -m DC.distill_mtgnn -de 6 -d ../data/PEMS-BAY -e 1000 -sp results/dc_pems_mtgnn2 -lrf 0.001 -lrs 0.001 -r 3e-4
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
-    parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**10, help='batch size')
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-2,help='learning rate')
     parser.add_argument('-lrf', '--lr_feat',type=float,default=0.1,help='learning rate')
     parser.add_argument('-r', '--reduction_rate',type=float,default=1e-3,help='learning rate')

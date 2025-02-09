@@ -169,7 +169,7 @@ class GradMatch:
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()
                     node1 = _model.gc.emb1.weight.detach().clone().cpu()
-                    torch.save({'x':synx, 'y':syny, 'node1': node1}, args.save_path + ".pt")
+                    torch.save({'x':synx_, 'y':syny_, 'node1': node1}, args.save_path + ".pt")
             else:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
