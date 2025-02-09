@@ -16,7 +16,7 @@ if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
-    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
@@ -37,7 +37,8 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
 
-    model = gtnet(True, True, 2, num_nodes,
+    '''
+    model = gtnet(True, True, 1, num_nodes,
                   device, predefined_A=None,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,
@@ -45,6 +46,14 @@ if __name__ == "__main__":
                   skip_channels=64, end_channels=128,
                   seq_length=12, in_dim=in_dim, out_dim=12,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)    
+    '''
+    
+    model = gtnet(True, True, 1, num_nodes,
+                  device, predefined_A=None,
+                  dropout=0.3, subgraph_size=20,
+                  node_dim=10, dilation_exponential=1,             
+                  seq_length=12, in_dim=in_dim, out_dim=12,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
     #model = gwnet(device, num_nodes, args.dropout, None, True, True, None, in_dim, args.seq_length, 32, 32, 256, 512, 2)
     model.to(device)
     #model.reset_parameters()

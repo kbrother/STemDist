@@ -1,6 +1,6 @@
 import torch.nn as nn
 from tqdm import tqdm
-from model.mtgnn import gtnet
+from model.mtgnn_small import gtnet
 import torch
 import util
 import sys
@@ -19,16 +19,7 @@ class GradMatch:
         self.device = device
         self.num_elems = int(args.reduction_rate *  data['train_loader'].xs.shape[0])
         scaler = data['scaler']
-        
-        # Define condensed data
-        '''
-        _shape = [self.num_elems] + list(data['train_loader'].xs.shape[1:])
-        self.synx = torch.rand(tuple(_shape), device=device, dtype=torch.float)
-        # num elems x seq len x num point x feature
-        _shape = [self.num_elems] + list(data['train_loader'].ys.shape[1:-1])
-        self.syny = torch.rand(_shape, device=device, dtype=torch.float)
-        # num elems x seq len x num point
-           '''
+      
         # Define condensed data
         num_total = data['train_loader'].xs.shape[0]
         sampled_idx = random.sample(list(range(num_total)), self.num_elems)
@@ -43,6 +34,14 @@ class GradMatch:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
+
+        self.node2cluster = np.load(args.mapping_path)
+        self.num_clusters = len(set(self.node2cluster))
+        num_node = self.node2cluster.shape[0]
+        self.cluster2node = [[] for _ in range(self.num_clusters)]        
+        for _n in range(num_node):
+            self.cluster2node[self.node2cluster[_n]].append(_n)
+        self.cluster2weight = [len(self.cluster2node[cl])/num_node for cl in range(self.num_clusters)]
         
 
     def test_syn(self):
@@ -134,12 +133,26 @@ class GradMatch:
                 realy = realy[:,:,:,0]  # batch x seq len x num node
                 output_real_temp = _model(realx.transpose(1, 3)).squeeze()
                 output_real = scaler.inverse_transform(output_real_temp)
-                loss_real, num_real = util.masked_se(output_real, realy, 0.)
-                gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
-                #gw_real = [_.detach().clone() for _ in gw_real if _ is not None]
-                    
+
+                _loss = 0
+                for cl in range(self.num_clusters):
+                    # synthetic grad
+                    loss_syn = util.mse(output_syn[:, :, self.cluster2node[cl]], syny[:,:,self.cluster2node[cl]])
+                    gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
+
+                     # real grad
+                    loss_real, num_real = util.masked_se(output_real[:, :, self.cluster2node[cl]], 
+                                                         realy[:,:,self.cluster2node[cl]], 0.)
+
+
+                    if cl < self.num_clusters - 1:
+                        gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
+                    else:
+                        gw_real = torch.autograd.grad(loss_real/num_real, model_params)
+                    gw_real = [_.detach().clone() for _ in gw_real]
+                    _loss += self.cluster2weight[cl] * util.match_loss(gw_syn, gw_real, self.device)
+                
                 #pbar.close()
-                _loss = util.match_loss(gw_syn, gw_real, self.device)
                 grad_loss += _loss.item()
                             
                 # gradient descent
@@ -174,13 +187,14 @@ class GradMatch:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
             
-# python -m DC.distill_mtgnn -de 0 -e 100 -sp results/dc_mtgnn.txt -lrf 0.01 -lrs 0.01 -r 1e-3
+# python -m DC_cluster.distill_mtgnn -de 0 -e 300 -sp results/dc_mtgnn_clus.txt -lrf 0.01 -lrs 0.01 -r 1e-3
 # python -m DC.distill_mtgnn -de 6 -d ../data/PEMS-BAY -e 1000 -sp results/dc_pems_mtgnn2 -lrf 0.001 -lrs 0.001 -r 3e-4
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-mp', '--mapping_path', type=str, default='DC_cluster/METR-LA.npy', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-2,help='learning rate')
     parser.add_argument('-lrf', '--lr_feat',type=float,default=0.1,help='learning rate')

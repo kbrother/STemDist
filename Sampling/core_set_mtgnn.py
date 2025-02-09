@@ -4,7 +4,7 @@ import copy
 import sys
 import util
 import random
-from model.mtgnn import gtnet
+from model.mtgnn_small import gtnet
 from tqdm import tqdm
 import numpy as np
 import argparse
@@ -39,7 +39,7 @@ class Coreset:
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
-        for i in tqdm(range(200)):
+        for i in tqdm(range(300)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
@@ -88,7 +88,7 @@ class RandomSample(Coreset):
             f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
 
 
-# python -m Sampling.core_set_mtgnn -de 0 -s 0 -lr 1e-2 -r 1e-3
+# python -m Sampling.core_set_mtgnn -de 3 -s 0 -lr 1e-2 -r 1e-2
 # python -m Sampling.core_set_mtgnn -d ../data/PEMS-BAY -de 4 -s 0 -lr 1e-2 -r 3e-4
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
