@@ -15,12 +15,13 @@ import copy
 
 class GradMatch:
 
-    def __init__(self, data, args, device):
-        self.data = data
+    def __init__(self, data1, data2, args, device):
+        self.data1 = data1
+        self.data2 = data2
         self.args = args
         self.device = device
-        self.num_elems = int(args.reduction_rate *  data['train_loader'].xs.shape[0])
-        scaler = data['scaler']
+        self.num_elems = int(args.reduction_rate *  data1['train_loader'].xs.shape[0])
+        scaler = data1['scaler']
         
         # Define condensed data
         '''
@@ -32,12 +33,12 @@ class GradMatch:
         # num elems x seq len x num point
            '''
         # Define condensed data
-        num_total = data['train_loader'].xs.shape[0]
+        num_total = data1['train_loader'].xs.shape[0]
         sampled_idx = random.sample(list(range(num_total)), self.num_elems)
-        self.synx = self.data['train_loader'].xs[sampled_idx]     
+        self.synx = self.data1['train_loader'].xs[sampled_idx]     
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         
-        self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
+        self.syny = self.data1['train_loader'].ys[sampled_idx, :, :, 0]
         self.syny = scaler.transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         
@@ -49,9 +50,9 @@ class GradMatch:
 
     def train_gtnet(self):
         args = self.args
-        num_nodes = self.data['train_loader'].xs.shape[2]
-        in_dim = self.data['train_loader'].xs.shape[3]
-        scaler = self.data['scaler']
+        num_nodes = self.data1['train_loader'].xs.shape[2]
+        in_dim = self.data1['train_loader'].xs.shape[3]
+        scaler = self.data1['scaler']
         self.trained_model = gtnet(True, True, 1, num_nodes,
                   device, predefined_A=None,
                   dropout=0.3, subgraph_size=20,
@@ -62,11 +63,11 @@ class GradMatch:
 
         _optimizer = optim.Adam(self.trained_model.parameters(), lr=0.01)
         min_val_mse = sys.float_info.max
-        for i in range(20):
+        for i in range(10):
     
             self.trained_model.train()
-            self.data['train_loader'].shuffle()
-            for iter, (x, y) in enumerate(self.data['train_loader'].get_iterator()):
+            self.data1['train_loader'].shuffle()
+            for iter, (x, y) in enumerate(self.data1['train_loader'].get_iterator()):
                 trainx = torch.tensor(x, device=device, dtype=torch.float)
                 trainx = trainx.transpose(1, 3)
                 trainy = torch.tensor(y, device=device, dtype=torch.float)
@@ -82,8 +83,8 @@ class GradMatch:
     
             self.trained_model.eval()
             with torch.no_grad():               
-                val_mse = self.trained_model.test_model(dataloader['val_loader'], scaler, device)
-                test_mse = self.trained_model.test_model(dataloader['test_loader'], scaler, device)            
+                val_mse = self.trained_model.test_model(self.data2['val_loader'], scaler, device)
+                test_mse = self.trained_model.test_model(self.data2['test_loader'], scaler, device)            
                 if min_val_mse > val_mse:
                     min_val_mse = val_mse
                     weights = copy.deepcopy(self.trained_model.state_dict())
@@ -94,7 +95,7 @@ class GradMatch:
         
     def test_syn(self):
         args = self.args
-        data = self.data
+        data = self.data2
         synx = self.synx.detach().clone()
         syny = self.syny.detach().clone()
 
@@ -139,7 +140,7 @@ class GradMatch:
     
     def train(self):
         args = self.args
-        data = self.data
+        data = self.data2
         synx, syny = self.synx, self.syny
 
         num_nodes = data['train_loader'].xs.shape[2]
@@ -225,8 +226,8 @@ class GradMatch:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
             
-# python -m DC.distill_mtgnn2 -de 1 -e 300 -sp results/dc_mtgnn2_4e-3 -lrf 1e-2 -lrs 0.01 -r 4e-3
-# python -m DC.distill_mtgnn -de 6 -d ../data/PEMS-BAY -e 1000 -sp results/dc_pems_mtgnn2 -lrf 0.001 -lrs 0.001 -r 3e-4
+# python -m DC.distill_mtgnn2 -de 2 -e 300 -sp results/dc_mtgnn2_2e-3 -lrf 1e-2 -lrs 0.01 -r 2e-3
+# python -m DC.distill_mtgnn2 -de 3 -d ../data/PEMS-BAY -e 300 -sp results/dc_mtgnn2_pems_2e-3 -lrf 1e-2 -lrs 0.01 -r 2e-3
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -252,9 +253,10 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(args.seed)
 
     device = torch.device(f"cuda:{args.device}")
-    dataloader = util.load_dataset(args.data, args.batch_size)
+    dataloader1 =  util.load_dataset(args.data, 128)
+    dataloader2 = util.load_dataset(args.data, args.batch_size)
     print("load finish")
 
-    algo = GradMatch(dataloader, args, device)
+    algo = GradMatch(dataloader1, dataloader2, args, device)
     algo.train_gtnet()
     algo.train()
