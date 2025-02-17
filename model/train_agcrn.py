@@ -7,6 +7,8 @@ from tqdm import tqdm
 import random
 import torch
 import numpy as np
+import sys
+
 
 # python -m model.train_agcrn -de 0 -d ../data/METR-LA -lr 0.01
 # python -m model.train_agcrn -de 1 -d ../data/PEMS-BAY -lr 0.01
@@ -37,6 +39,7 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
+    #print(static_feat)
     model = AGCRN(args, num_nodes, in_dim)
     #init loss function, optimizer    
 
@@ -47,7 +50,8 @@ if __name__ == "__main__":
             nn.init.xavier_uniform_(p)
         else:
             nn.init.uniform_(p)
-    
+
+    min_val_mse = sys.float_info.max
     for e in range(args.epochs):
         model.train()
         train_loss, num_entry = 0, 0
@@ -73,4 +77,7 @@ if __name__ == "__main__":
             test_mae = model.test_model(dataloader['test_loader'], scaler, device)            
             print(f'epoch: {e}, valid mae: {val_mae}, test mae: {test_mae}')
 
-            
+            if min_val_mse > val_mae:
+                min_val_mse = val_mae
+                vec = model.node_embeddings.data.cpu().numpy()
+                np.save("model/node_embed_agcrn_pems.npy", vec)

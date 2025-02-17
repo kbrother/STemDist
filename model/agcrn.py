@@ -18,6 +18,8 @@ class AVWGCN(nn.Module):
         #output shape [B, N, C]
         node_num = node_embeddings.shape[0]
         supports = F.softmax(F.relu(torch.mm(node_embeddings, node_embeddings.transpose(0, 1))), dim=1)
+        #supports = F.relu(F.tanh(torch.mm(node_embeddings, node_embeddings.transpose(0, 1))))
+        
         support_set = [torch.eye(node_num).to(supports.device), supports]
         #default cheb_k = 3
         for k in range(2, self.cheb_k):
@@ -108,7 +110,8 @@ class AGCRN(nn.Module):
         if node_embed is None:
             self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, args.embed_dim), requires_grad=True)
         else:
-            self.node_embeddings = nn.Parameter(node_embed)
+            #self.node_embeddings = nn.Parameter(node_embed)
+            self.node_embeddings = node_embed
 
         self.encoder = AVWDCRNN(self.num_nodes, input_dim, args.rnn_units, 2,
                                 args.embed_dim, args.num_layers)

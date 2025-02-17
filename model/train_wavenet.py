@@ -8,6 +8,9 @@ import random
 from model.gwave import gwnet
 import torch.optim as optim
 import math
+from scipy.io import loadmat
+import sys
+import numpy as np
 
 
 # python -m model.train_wavenet -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
@@ -39,12 +42,13 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
-    model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
-    #model = gwnet(device, num_nodes, args.dropout, None, True, True, None, in_dim, args.seq_length, 32, 32, 256, 512, 2)
+    model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid,                   
+                  dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
     model.to(device)
     #model.reset_parameters()
     
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    min_val_mse = sys.float_info.max
     for i in range(args.epochs):
 
         model.train()
@@ -68,3 +72,9 @@ if __name__ == "__main__":
             val_mae = model.test_model(dataloader['val_loader'], scaler)
             test_mae = model.test_model(dataloader['test_loader'], scaler)            
             print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+
+            if min_val_mse > val_mae:
+                min_val_mse = val_mae
+                vec1 = model.nodevec1.data.cpu().numpy()
+                vec2 = model.nodevec2.data.cpu().numpy()
+                np.save('model/node_embed_pems.npy', {'v1': vec1, 'v2': vec2})

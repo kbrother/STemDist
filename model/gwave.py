@@ -64,7 +64,7 @@ class gwnet(nn.Module):
         self.filter_convs = nn.ModuleList()
         self.gate_convs = nn.ModuleList()
         self.skip_convs = nn.ModuleList()
-        #self.bn = nn.ModuleList()
+        self.bn = nn.ModuleList()
         self.gconv = nn.ModuleList()
 
         self.start_conv = nn.Conv2d(in_channels=in_dim,
@@ -78,11 +78,12 @@ class gwnet(nn.Module):
         if node_vec1 is None:
             self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
             self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
+            #self.nodevec2 = self.nodevec1.T
         else:
-            self.nodevec1 = nn.Parameter(node_vec1)
-            self.nodevec2 = nn.Parameter(node_vec2.T)
-            #self.nodevec1 = node_vec.to(device)
-            #self.nodevec2 = node_vec.T.to(device)
+            #self.nodevec1 = nn.Parameter(node_vec1)
+            #self.nodevec2 = nn.Parameter(node_vec2.T)
+            self.nodevec1 = node_vec1.to(device)
+            self.nodevec2 = node_vec2.to(device)
 
         for b in range(blocks):
             new_dilation = 1       
@@ -101,7 +102,7 @@ class gwnet(nn.Module):
                                                  out_channels=skip_channels,
                                                  kernel_size=(1, 1)))
 
-                #self.bn.append(nn.BatchNorm2d(residual_channels))
+                self.bn.append(nn.BatchNorm2d(residual_channels))
                 receptive_field += new_dilation
                 new_dilation *=2
                 if (b<blocks-1) or (i<layers - 1):
@@ -130,6 +131,7 @@ class gwnet(nn.Module):
         skip = 0
 
         adj = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec2)), dim=1)
+        #adj = F.relu(F.tanh(torch.mm(self.nodevec1, self.nodevec2)))
         for i in range(self.blocks * self.layers):
             # Gated TCN
             residual = x
@@ -151,7 +153,7 @@ class gwnet(nn.Module):
             if i<(self.blocks*self.layers)-1:
                 x = self.gconv[i](x, adj)
                 x = x + residual[:, :, :, -x.size(3):]
-            #x = self.bn[i](x)
+            x = self.bn[i](x)
 
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))

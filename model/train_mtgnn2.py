@@ -5,15 +5,12 @@ import time
 import util
 from tqdm import tqdm
 import random
-from model.mtgnn import gtnet
+from model.mtgnn_small import gtnet
 import torch.optim as optim
 import math
-from scipy.io import loadmat
-import sys
 
-
-# python -m model.train_mtgnn -de 2 -d ../data/METR-LA -lr 1e-2 -e 100
-# python -m model.train_mtgnn -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 1 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -39,17 +36,34 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
 
+    '''
     model = gtnet(True, True, 1, num_nodes,
                   device, predefined_A=None,
                   dropout=0.3, subgraph_size=20,
+                  node_dim=10, dilation_exponential=1,
+                  conv_channels=32, residual_channels=32,
+                  skip_channels=64, end_channels=128,
+                  seq_length=12, in_dim=in_dim, out_dim=12,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)    
+    '''
+
+    static_feat = np.load("model/node_embed.npy", allow_pickle=True)
+    #print(static_feat)
+    static_feat1 = static_feat[()]['v1']
+    static_feat2 = static_feat[()]['v2']
+    static_feat1 = torch.tensor(static_feat1, device=device, dtype=torch.float)
+    static_feat2 = torch.tensor(static_feat2, device=device, dtype=torch.float).transpose(0, 1)
+    model = gtnet(True, True, 1, num_nodes,
+                  device, predefined_A=None,
+                  dropout=0.3, subgraph_size=20, 
+                  static_feat1=static_feat1, static_feat2=static_feat2,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=12, in_dim=in_dim, out_dim=12,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
     #model = gwnet(device, num_nodes, args.dropout, None, True, True, None, in_dim, args.seq_length, 32, 32, 256, 512, 2)
     model.to(device)
     #model.reset_parameters()
-
-    min_val_mse = sys.float_info.max
+    
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     for i in range(args.epochs):
 
@@ -74,8 +88,3 @@ if __name__ == "__main__":
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)            
             print(f'epoch: {i}, valid mse: {val_mse}, test mse: {test_mse}')
-
-            if min_val_mse > val_mse:
-                min_val_mse = val_mse
-                vec = model.gc.emb1.weight.cpu().numpy()
-                np.save("model/node_embed_mtgnn_pems.npy", vec)

@@ -15,22 +15,29 @@ import copy
 from model.agcrn import AGCRN
 
 
-def test_gwnet(args, data, synx, syny, node_embed1, node_embed2, device):
+def test_gwnet(args, data, synx, syny, device):
+    static_feat = np.load("model/node_embed_gwave_pems.npy", allow_pickle=True)
+    #print(static_feat)
+    node_embed1 = static_feat[()]['v1']
+    node_embed2 = static_feat[()]['v2']
+    node_embed1 = torch.tensor(node_embed1, device=device, dtype=torch.float)
+    node_embed2 = torch.tensor(node_embed2, device=device, dtype=torch.float).transpose(0, 1)
+    
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
+    _model =  gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid, 
+                  node_vec1=node_embed1, node_vec2=node_embed2.transpose(0, 1),
+                  dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
     '''
     _model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, 
                    residual_channels=args.nhid, dilation_channels=args.nhid, 
-                   skip_channels=8*args.nhid, end_channels=16*args.nhid, node_vec1=node_embed1, node_vec2=node_embed2)
-    ''' 
-    _model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, 
-                   residual_channels=args.nhid, dilation_channels=args.nhid, 
                    skip_channels=8*args.nhid, end_channels=16*args.nhid)
+    '''
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-    for i in tqdm(range(400)):
+    for i in tqdm(range(500)):
         _model.train()
         output_syn = _model(synx.transpose(1,3)).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
@@ -57,17 +64,21 @@ def test_gwnet(args, data, synx, syny, node_embed1, node_embed2, device):
     print(f'test :{test_loss}')
 
 
-def test_agcrn(args, data, synx, syny, node_embed, device):
+def test_agcrn(args, data, synx, syny, device):
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
-    #_model = AGCRN(args, num_nodes, in_dim, node_embed)
-    _model = AGCRN(args, num_nodes, in_dim)
+    
+    node_embed = np.load("model/node_embed_agcrn_pems.npy")
+    #print(static_feat)
+    node_embed = torch.tensor(node_embed, device=device, dtype=torch.float)    
+    _model = AGCRN(args, num_nodes, in_dim, node_embed)
+    #_model = AGCRN(args, num_nodes, in_dim)
     
     for p in _model.parameters():
-        #if p.shape == (num_nodes, args.embed_dim):
-        #    print("here")
-        #    continue
+        if p.shape == (num_nodes, args.embed_dim):
+            print("here")
+            continue
             
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -78,7 +89,7 @@ def test_agcrn(args, data, synx, syny, node_embed, device):
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-    for i in tqdm(range(400)):
+    for i in tqdm(range(500)):
         _model.train()
         output_syn = _model(synx).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
@@ -105,12 +116,15 @@ def test_agcrn(args, data, synx, syny, node_embed, device):
     print(f'test :{test_loss}')    
 
 
-def test_mtgnn(args, data, synx, syny, node_embed, device):
+def test_mtgnn(args, data, synx, syny, device):
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
+    node_embed = np.load("model/node_embed_mtgnn_pems.npy")
+    #print(static_feat)
+    node_embed = torch.tensor(node_embed, device=device, dtype=torch.float)    
     _model = gtnet(True, True, 2, num_nodes,
-                  device, predefined_A=None, static_feat=node_embed.to(device),
+                  device, predefined_A=None, static_feat=node_embed,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,
                   conv_channels=32, residual_channels=32,
@@ -184,8 +198,8 @@ def test_stemgnn(args, data, synx, syny, node_embed, device):
     print(f'test :{test_loss}')
 
 
-# python -m load_and_train -de 3 -lrs 1e-2 -lp results/dc_mtgnn2.pt
-# python -m load_and_train -de 4 -d ../data/PEMS-BAY -lrs 1e-3 -lp results/dc_pems_mtgnn4.pt
+# python -m load_and_train -de 1 -lrs 1e-2 -lp results/dc_mtgnn2_2e-3.pt
+# python -m load_and_train -de 0 -d ../data/PEMS-BAY -lrs 1e-2 -lp results/dc_mtgnn2_pems_2e-3.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -215,13 +229,11 @@ if __name__ == "__main__":
     raw_data = torch.load(args.load_path)
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
-    node_embed1 = raw_data['node1']
-    #node_embed2 = raw_data['node2']
-
+    
     print(synx.shape)
     print(syny.shape)
     
-    #test_gwnet(args, dataloader, synx, syny, node_embed1, node_embed2, device)
-    #test_agcrn(args, dataloader, synx, syny, node_embed1, device)
+    #test_gwnet(args, dataloader, synx, syny, device)
+    test_agcrn(args, dataloader, synx, syny, device)
     #test_stemgnn(args, dataloader, synx, syny, node_embed1, device)
-    test_mtgnn(args, dataloader, synx, syny, node_embed1, device)
+    #test_mtgnn(args, dataloader, synx, syny, device)
