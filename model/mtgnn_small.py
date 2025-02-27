@@ -3,11 +3,10 @@ import util
 
 
 class gtnet(nn.Module):
-    def __init__(self, gcn_true, buildA_true, gcn_depth, num_nodes, device, predefined_A=None, static_feat1=None, static_feat2=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=16, residual_channels=16, skip_channels=32, end_channels=64, seq_length=12, in_dim=2, out_dim=12, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
+    def __init__(self, gcn_true, buildA_true, gcn_depth, device, predefined_A=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=16, residual_channels=16, skip_channels=32, end_channels=64, seq_length=12, in_dim=2, out_dim=12, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
         super(gtnet, self).__init__()
         self.gcn_true = gcn_true
         self.buildA_true = buildA_true
-        self.num_nodes = num_nodes
         self.dropout = dropout
         self.predefined_A = predefined_A
         self.filter_convs = nn.ModuleList()
@@ -20,7 +19,7 @@ class gtnet(nn.Module):
         self.start_conv = nn.Conv2d(in_channels=in_dim,
                                     out_channels=residual_channels,
                                     kernel_size=(1, 1))
-        self.gc = graph_constructor(num_nodes, subgraph_size, node_dim, device, alpha=tanhalpha, static_feat1=static_feat1, static_feat2=static_feat2)
+        self.gc = graph_constructor(subgraph_size, node_dim, device, alpha=tanhalpha)
 
         self.seq_length = seq_length
         kernel_size = 3
@@ -59,9 +58,9 @@ class gtnet(nn.Module):
                     self.gconv1.append(mixprop(conv_channels, residual_channels, gcn_depth, dropout, propalpha))              
 
                 if self.seq_length>self.receptive_field:
-                    self.norm.append(LayerNorm((residual_channels, num_nodes, self.seq_length - rf_size_j + 1),elementwise_affine=layer_norm_affline))
+                    self.norm.append(LayerNorm((residual_channels, 207, self.seq_length - rf_size_j + 1), elementwise_affine=layer_norm_affline))
                 else:
-                    self.norm.append(LayerNorm((residual_channels, num_nodes, self.receptive_field - rf_size_j + 1),elementwise_affine=layer_norm_affline))
+                    self.norm.append(LayerNorm((residual_channels, 207, self.receptive_field - rf_size_j + 1), elementwise_affine=layer_norm_affline))
 
                 new_dilation *= dilation_exponential
 
@@ -82,10 +81,13 @@ class gtnet(nn.Module):
             self.skip0 = nn.Conv2d(in_channels=in_dim, out_channels=skip_channels, kernel_size=(1, self.receptive_field), bias=True)
             self.skipE = nn.Conv2d(in_channels=residual_channels, out_channels=skip_channels, kernel_size=(1, 1), bias=True)
 
+        self.idx = torch.arange(207).to(device)
 
-        self.idx = torch.arange(self.num_nodes).to(device)
 
-
+    def set_node_embed(self, node_embed):
+        self.gc.register_buffer("node_embed", node_embed)
+        
+        
     def forward(self, input, idx=None):
         seq_len = input.size(3)
         assert seq_len==self.seq_length, 'input sequence length not equal to preset sequence length'
@@ -93,14 +95,9 @@ class gtnet(nn.Module):
         if self.seq_length<self.receptive_field:
             input = nn.functional.pad(input,(self.receptive_field-self.seq_length,0,0,0))
 
-
-
         if self.gcn_true:
             if self.buildA_true:
-                if idx is None:
-                    adp = self.gc(self.idx)
-                else:
-                    adp = self.gc(idx)
+                adp = self.gc()
             else:
                 adp = self.predefined_A
 
@@ -120,11 +117,23 @@ class gtnet(nn.Module):
                 x = self.residual_convs[i](x)
 
             x = x + residual[:, :, :, -x.size(3):]
+            # B x C X N x L'
+
             if idx is None:
                 x = self.norm[i](x,self.idx)
             else:
                 x = self.norm[i](x,idx)
 
+            '''
+            num_nodes = x.shape[2]
+            num_channel = x.shape[1]
+            num_l = x.shape[3]
+            x = torch.transpose(x, 1, 2).reshape(-1, num_channel, num_l) #BN X C X L'
+            x = self.norm[i](x)
+            x = x.reshape(-1, num_nodes, num_channel, num_l) #B x N X C X L'
+            x = torch.transpose(x, 1, 2) 
+            ''' 
+        
         skip = self.skipE(x) + skip
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
@@ -132,10 +141,14 @@ class gtnet(nn.Module):
         return x
 
     
-    def test_model(self, dataloader, scaler, device):
+    def test_model(self, embedding, dataloader, scaler, device):
         loss_sum, num_entry = 0, 0
-        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):        
             valx = torch.tensor(x, device=device, dtype=torch.float)
+            node_embed = embedding(valx[...,0])
+            node_embed = torch.mean(node_embed, dim=0)
+            self.set_node_embed(node_embed)
+            
             valx = valx.transpose(1, 3)
             valy = torch.tensor(y, device=device, dtype=torch.float)
             valy = valy[:,:,:,0]

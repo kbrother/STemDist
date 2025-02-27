@@ -159,7 +159,7 @@ def distance_wb_taehyung(gwr, gws):
     elif len(shape) == 1: # batchnorm/instancenorm, C; groupnorm x, bias
         gwr = gwr.reshape(1, shape[0])
         gws = gws.reshape(1, shape[0])
-        return torch.tensor(0, dtype=torch.float, device=gwr.device)
+        #return torch.tensor(0, dtype=torch.float, device=gwr.device)
 
     weight = 1/shape[0]
     dis = 1 - torch.sum(gwr * gws, dim=-1) / (torch.norm(gwr, dim=-1) * torch.norm(gws, dim=-1) + 0.000001)

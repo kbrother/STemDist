@@ -150,27 +150,17 @@ class dilated_inception(nn.Module):
 
 
 class graph_constructor(nn.Module):
-    def __init__(self, nnodes, k, dim, device, alpha=3, static_feat1=None, static_feat2=None):
+    def __init__(self, k, dim, device, alpha=3):
         super(graph_constructor, self).__init__()
-        self.nnodes = nnodes
-        self.sf1 = static_feat1
-        self.sf2 = static_feat2        
-        if static_feat1 is None:
-            self.emb1 = nn.Embedding(nnodes, dim)
-
         self.device = device
         self.k = k
         self.dim = dim
         self.alpha = alpha
         
 
-    def forward(self, idx):
-        if self.sf1 is None:
-            nodevec1 = self.emb1(idx)
-            nodevec2 = self.emb1(idx)
-        else:
-            nodevec1 = self.sf1[idx]
-            nodevec2 = self.sf2[idx]
+    def forward(self):     
+        nodevec1 = self.node_embed
+        nodevec2 = self.node_embed
         a = torch.mm(nodevec1, nodevec2.transpose(0,1))
         adj = F.relu(F.tanh(a))
         #mask = torch.zeros(idx.size(0), idx.size(0)).to(self.device)
