@@ -1,6 +1,26 @@
 from model.layers_small import *
 import util
+import math
 
+class NodeEmbedding(nn.Module):
+    def __init__(self, seq_len, hidden_size, rank):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.W_q = nn.Linear(seq_len, hidden_size, bias=False)
+        self.W_k = nn.Linear(seq_len, hidden_size, bias=False)
+        self.W_v = nn.Linear(seq_len, hidden_size, bias=False)
+        self.linear = nn.Linear(hidden_size, rank)
+
+    # X: batch size x seq len x num point
+    def forward(self, X):
+        X = torch.transpose(X, 1, 2)
+        Q = self.W_q(X)  # batch size x num point x hidden dim
+        K = self.W_k(X)
+        V = self.W_v(X)
+        E = F.softmax(torch.bmm(Q, torch.transpose(K, 1, 2))/math.sqrt(self.hidden_size), dim=-1)  # batch size x num point x num point
+        E = torch.bmm(E, V)  #  batch size x num point x hidden dim
+        return F.relu(self.linear(E))  #  batch size x num point x rank
+        
 
 class gtnet(nn.Module):
     def __init__(self, gcn_true, buildA_true, gcn_depth, device, predefined_A=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=16, residual_channels=16, skip_channels=32, end_channels=64, seq_length=12, in_dim=2, out_dim=12, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
@@ -84,8 +104,9 @@ class gtnet(nn.Module):
         self.idx = torch.arange(207).to(device)
 
 
-    def set_node_embed(self, node_embed):
-        self.gc.register_buffer("node_embed", node_embed)
+    def set_node_embed(self, node_embed1, node_embed2):
+        self.gc.register_buffer("node_embed1", node_embed1)
+        self.gc.register_buffer("node_embed2", node_embed2)
         
         
     def forward(self, input, idx=None):
@@ -141,13 +162,15 @@ class gtnet(nn.Module):
         return x
 
     
-    def test_model(self, embedding, dataloader, scaler, device):
+    def test_model(self, embedding1, embedding2, dataloader, scaler, device):
         loss_sum, num_entry = 0, 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):        
             valx = torch.tensor(x, device=device, dtype=torch.float)
-            node_embed = embedding(valx[...,0])
-            node_embed = torch.mean(node_embed, dim=0)
-            self.set_node_embed(node_embed)
+            node_embed1 = embedding1(valx[...,0])
+            node_embed1 = torch.mean(node_embed1, dim=0)
+            node_embed2 = embedding2(valx[...,0])
+            node_embed2 = torch.mean(node_embed2, dim=0)
+            self.set_node_embed(node_embed1, node_embed2)
             
             valx = valx.transpose(1, 3)
             valy = torch.tensor(y, device=device, dtype=torch.float)

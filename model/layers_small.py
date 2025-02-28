@@ -159,8 +159,8 @@ class graph_constructor(nn.Module):
         
 
     def forward(self):     
-        nodevec1 = self.node_embed
-        nodevec2 = self.node_embed
+        nodevec1 = self.node_embed1
+        nodevec2 = self.node_embed2
         a = torch.mm(nodevec1, nodevec2.transpose(0,1))
         adj = F.relu(F.tanh(a))
         #mask = torch.zeros(idx.size(0), idx.size(0)).to(self.device)
