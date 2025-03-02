@@ -8,9 +8,10 @@ import random
 from model.mtgnn_small import gtnet, NodeEmbedding
 import torch.optim as optim
 import math
+import sys
 
 
-# python -m model.train_mtgnn2 -de 1 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -50,6 +51,7 @@ if __name__ == "__main__":
 
     params = list(model.parameters()) + list(embedding1.parameters()) + list(embedding2.parameters())
     _optimizer = optim.Adam(params, lr=args.learning_rate)
+    min_loss = sys.float_info.max
     for i in range(args.epochs):
         model.train()
         embedding1.train()
@@ -82,3 +84,7 @@ if __name__ == "__main__":
             val_mse = model.test_model(embedding1, embedding2, dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(embedding1, embedding2, dataloader['test_loader'], scaler, device)            
             print(f'epoch: {i}, valid mse: {val_mse}, test mse: {test_mse}')
+
+            if min_loss > val_mse:
+                min_loss = val_mse
+                torch.save({'e1': embedding1.state_dict(), 'e2': embedding2.state_dict()}, "embedding.pth")

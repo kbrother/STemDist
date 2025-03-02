@@ -1,6 +1,6 @@
 import torch.nn as nn
 from tqdm import tqdm
-from model.mtgnn_small import gtnet
+from model.mtgnn_small import gtnet, NodeEmbedding
 import torch
 import util
 import sys
@@ -50,15 +50,14 @@ class GradMatch:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
         seq_len = self.syny.shape[1]        
-        self.embedding = NodeEmbedding(seq_len, 256, 10).to(self.device)
-        '''
-        static_feat = np.load("model/node_embed.npy", allow_pickle=True)
-        #print(static_feat)
-        static_feat1 = static_feat[()]['v1']
-        static_feat2 = static_feat[()]['v2']
-        self.static_feat1 = torch.tensor(static_feat1, device=device, dtype=torch.float)
-        self.static_feat2 = torch.tensor(static_feat2, device=device, dtype=torch.float).transpose(0, 1)
-        '''
+        self.embedding1 = NodeEmbedding(seq_len, 256, 10).to(self.device)
+        self.embedding2 = NodeEmbedding(seq_len, 256, 10).to(self.device)
+
+        embed_dict = torch.load("embedding.pth")
+        self.embedding1.load_state_dict(embed_dict['e1'])
+        self.embedding2.load_state_dict(embed_dict['e2'])
+        self.embedding1.eval()
+        self.embedding2.eval()
         
         
     def test_syn(self):
@@ -79,14 +78,15 @@ class GradMatch:
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max
 
-        self.embedding.eval()
-        with torch.no_grad():                    
-            node_embed_syn = self.embedding(synx[..., 0])
-            node_embed_syn = torch.mean(node_embed_syn, dim=0)  # num point x rank        
-            
+        with torch.no_grad():
+            node_embed1 = self.embedding1(synx[..., 0])
+            node_embed1 = torch.mean(node_embed1, dim=0)  # num point x rank
+            node_embed2 = self.embedding2(synx[..., 0])
+            node_embed2 = torch.mean(node_embed2, dim=0)  # num point x rank        
+                
         for i in tqdm(range(200)):
+            _model.set_node_embed(node_embed1, node_embed2)       
             _model.train()
-            _model.set_node_embed(node_embed_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()
             loss_syn = F.mse_loss(output_syn, syny)
             optimizer.zero_grad()
@@ -96,7 +96,7 @@ class GradMatch:
             _model.eval()
             if (i+1)%10 == 0:
                 with torch.no_grad():
-                    val_loss = _model.test_model(self.embedding, data['val_loader'], scaler, device)
+                    val_loss = _model.test_model(self.embedding1, self.embedding2, data['val_loader'], scaler, device)
     
                 if min_val_loss > val_loss:
                     min_i = i
@@ -106,7 +106,7 @@ class GradMatch:
         _model.load_state_dict(min_params)
         _model.eval()
         with torch.no_grad():
-            test_loss = _model.test_model(self.embedding, data['test_loader'], scaler, device)
+            test_loss = _model.test_model(self.embedding1, self.embedding2, data['test_loader'], scaler, device)
 
         return min_i, min_val_loss, test_loss
 
@@ -124,7 +124,7 @@ class GradMatch:
         #with open(args.save_path, 'a') as f:
         #    f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
         min_val_loss = sys.float_info.max
-        optimizer = torch.optim.Adam([synx, syny] + list(self.embedding.parameters()), lr=args.lr_feat)
+        optimizer = torch.optim.Adam([synx, syny], lr=args.lr_feat)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()
             data['train_loader'].current_ind = 0            
@@ -144,14 +144,15 @@ class GradMatch:
             num_ol = 20
             num_real_total = 0
             for ol in range(num_ol):            
-                self.embedding.train()
                 # Compute real gradient                            
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                node_embed = self.embedding(realx[..., 0])  #  batch size x num point x rank
-                node_embed = torch.mean(node_embed, dim=0)  # num point x rank
-                _model.set_node_embed(node_embed)
+                node_embed1 = self.embedding1(realx[..., 0])  #  batch size x num point x rank
+                node_embed1 = torch.mean(node_embed1, dim=0)  # num point x rank
+                node_embed2 = self.embedding2(realx[..., 0])
+                node_embed2 = torch.mean(node_embed2, dim=0)  # num point x rank
+                _model.set_node_embed(node_embed1, node_embed2)
                 
                 realy = realy[:,:,:,0]  # batch x seq len x num node
                 output_real_temp = _model(realx.transpose(1, 3)).squeeze()
@@ -160,9 +161,11 @@ class GradMatch:
                 gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                 gw_real = [_.detach().clone() for _ in gw_real]
 
-                node_embed = self.embedding(synx[..., 0])
-                node_embed = torch.mean(node_embed, dim=0)  # num point x rank
-                _model.set_node_embed(node_embed)
+                node_embed1 = self.embedding1(synx[..., 0])
+                node_embed1 = torch.mean(node_embed1, dim=0)  # num point x rank
+                node_embed2 = self.embedding2(synx[..., 0])
+                node_embed2 = torch.mean(node_embed2, dim=0)  # num point x rank
+                _model.set_node_embed(node_embed1, node_embed2)
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
                 loss_syn = F.mse_loss(output_syn, syny)
                 gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
@@ -179,12 +182,13 @@ class GradMatch:
                     break
                     
                 num_il = 10
-                self.embedding.eval()
                 synx_in, syny_in = synx.detach(), syny.detach()
                 with torch.no_grad():
-                    node_embed = self.embedding(synx_in[..., 0])
-                node_embed = torch.mean(node_embed, dim=0)  # num point x rank
-                _model.set_node_embed(node_embed)
+                    node_embed1 = self.embedding1(synx_in[..., 0])
+                    node_embed1 = torch.mean(node_embed1, dim=0)  # num point x rank
+                    node_embed2 = self.embedding2(synx_in[..., 0])
+                    node_embed2 = torch.mean(node_embed2, dim=0)  # num point x rank
+                    _model.set_node_embed(node_embed1, node_embed2)
                 for il in range(num_il):
                     optimizer_model.zero_grad()
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
@@ -206,7 +210,7 @@ class GradMatch:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
 
-# python -m DC.distill_mtgnn2 -de 1 -e 300 -sp results/dc_mtgnn2_sr2e-2_nr1e-1 -lrf 1e-2 -lrs 0.01 -sr 2e-2 -nr 1e-1
+# python -m DC.distill_mtgnn2 -de 1 -e 300 -sp results/dc_mtgnn2_sr2e-3 -lrf 1e-2 -lrs 0.01 -sr 2e-3
 # python -m DC.distill_mtgnn2 -de 3 -d ../data/PEMS-BAY -e 300 -sp results/dc_mtgnn2_pems_2e-3 -lrf 1e-2 -lrs 0.01 -r 2e-3
 if __name__ == "__main__":
     torch.set_num_threads(4)
