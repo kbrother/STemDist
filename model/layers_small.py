@@ -157,7 +157,8 @@ class graph_constructor(nn.Module):
         self.sf2 = static_feat2        
         if static_feat1 is None:
             self.emb1 = nn.Embedding(nnodes, dim)
-
+            self.emb2 = nn.Embedding(nnodes, dim)
+            
         self.device = device
         self.k = k
         self.dim = dim
@@ -167,7 +168,7 @@ class graph_constructor(nn.Module):
     def forward(self, idx):
         if self.sf1 is None:
             nodevec1 = self.emb1(idx)
-            nodevec2 = self.emb1(idx)
+            nodevec2 = self.emb2(idx)
         else:
             nodevec1 = self.sf1[idx]
             nodevec2 = self.sf2[idx]
