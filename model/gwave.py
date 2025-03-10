@@ -81,7 +81,7 @@ class gwnet(nn.Module):
             #self.nodevec2 = self.nodevec1.T
         else:
             #self.nodevec1 = nn.Parameter(node_vec1)
-            #self.nodevec2 = nn.Parameter(node_vec2.T)
+            #self.nodevec2 = nn.Parameter(node_vec2)
             self.nodevec1 = node_vec1.to(device)
             self.nodevec2 = node_vec2.to(device)
 

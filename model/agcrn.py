@@ -9,17 +9,12 @@ class AVWGCN(nn.Module):
         super(AVWGCN, self).__init__()
         self.cheb_k = cheb_k
         self.weights_pool = nn.Parameter(torch.FloatTensor(embed_dim, cheb_k, dim_in, dim_out))
-        self.bias_pool = nn.Parameter(torch.FloatTensor(embed_dim, dim_out))        
-        #self.weights = nn.Parameter(torch.FloatTensor(cheb_k, dim_in, dim_out))
-        #self.bias = nn.Parameter(torch.FloatTensor(dim_out))
-  
+        self.bias_pool = nn.Parameter(torch.FloatTensor(embed_dim, dim_out))
     def forward(self, x, node_embeddings):
         #x shaped[B, N, C], node_embeddings shaped [N, D] -> supports shaped [N, N]
         #output shape [B, N, C]
         node_num = node_embeddings.shape[0]
         supports = F.softmax(F.relu(torch.mm(node_embeddings, node_embeddings.transpose(0, 1))), dim=1)
-        #supports = F.relu(F.tanh(torch.mm(node_embeddings, node_embeddings.transpose(0, 1))))
-        
         support_set = [torch.eye(node_num).to(supports.device), supports]
         #default cheb_k = 3
         for k in range(2, self.cheb_k):
@@ -30,14 +25,12 @@ class AVWGCN(nn.Module):
         x_g = torch.einsum("knm,bmc->bknc", supports, x)      #B, cheb_k, N, dim_in
         x_g = x_g.permute(0, 2, 1, 3)  # B, N, cheb_k, dim_in
         x_gconv = torch.einsum('bnki,nkio->bno', x_g, weights) + bias     #b, N, dim_out
-        #x_gconv = torch.einsum('bnki,kio->bno', x_g, self.weights) + self.bias.unsqueeze(0).unsqueeze(0)     #b, N, dim_out
         return x_gconv
 
 
 class AGCRNCell(nn.Module):
-    def __init__(self, node_num, dim_in, dim_out, cheb_k, embed_dim):
+    def __init__(self, dim_in, dim_out, cheb_k, embed_dim):
         super(AGCRNCell, self).__init__()
-        self.node_num = node_num
         self.hidden_dim = dim_out
         self.gate = AVWGCN(dim_in+self.hidden_dim, 2*dim_out, cheb_k, embed_dim)
         self.update = AVWGCN(dim_in+self.hidden_dim, dim_out, cheb_k, embed_dim)
@@ -54,26 +47,25 @@ class AGCRNCell(nn.Module):
         h = r*state + (1-r)*hc
         return h
 
-    def init_hidden_state(self, batch_size):
-        return torch.zeros(batch_size, self.node_num, self.hidden_dim)
+    def init_hidden_state(self, batch_size, node_num):
+        return torch.zeros(batch_size, node_num, self.hidden_dim)
 
 
 class AVWDCRNN(nn.Module):
-    def __init__(self, node_num, dim_in, dim_out, cheb_k, embed_dim, num_layers=1):
+    def __init__(self, dim_in, dim_out, cheb_k, embed_dim, num_layers=1):
         super(AVWDCRNN, self).__init__()
         assert num_layers >= 1, 'At least one DCRNN layer in the Encoder.'
-        self.node_num = node_num
         self.input_dim = dim_in
         self.num_layers = num_layers
         self.dcrnn_cells = nn.ModuleList()
-        self.dcrnn_cells.append(AGCRNCell(node_num, dim_in, dim_out, cheb_k, embed_dim))
+        self.dcrnn_cells.append(AGCRNCell(dim_in, dim_out, cheb_k, embed_dim))
         for _ in range(1, num_layers):
-            self.dcrnn_cells.append(AGCRNCell(node_num, dim_out, dim_out, cheb_k, embed_dim))
+            self.dcrnn_cells.append(AGCRNCell(dim_out, dim_out, cheb_k, embed_dim))
 
     def forward(self, x, init_state, node_embeddings):
         #shape of x: (B, T, N, D)
         #shape of init_state: (num_layers, B, N, hidden_dim)
-        assert x.shape[2] == self.node_num and x.shape[3] == self.input_dim
+        #assert x.shape[2] == self.node_num and x.shape[3] == self.input_dim
         seq_length = x.shape[1]
         current_inputs = x
         output_hidden = []
@@ -90,10 +82,10 @@ class AVWDCRNN(nn.Module):
         #last_state: (B, N, hidden_dim)
         return current_inputs, output_hidden
 
-    def init_hidden(self, batch_size):
+    def init_hidden(self, batch_size, node_num):
         init_states = []
         for i in range(self.num_layers):
-            init_states.append(self.dcrnn_cells[i].init_hidden_state(batch_size))
+            init_states.append(self.dcrnn_cells[i].init_hidden_state(batch_size, node_num))
         return torch.stack(init_states, dim=0)      #(num_layers, B, N, hidden_dim)
 
 
@@ -113,7 +105,7 @@ class AGCRN(nn.Module):
             #self.node_embeddings = nn.Parameter(node_embed)
             self.node_embeddings = node_embed
 
-        self.encoder = AVWDCRNN(self.num_nodes, input_dim, args.rnn_units, 2,
+        self.encoder = AVWDCRNN(input_dim, args.rnn_units, 2,
                                 args.embed_dim, args.num_layers)
 
         #predictor
@@ -123,14 +115,15 @@ class AGCRN(nn.Module):
         #source: B, T_1, N, D
         #target: B, T_2, N, C
         #supports = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec1.transpose(0,1))), dim=1)
-        
-        init_state = self.encoder.init_hidden(source.shape[0])
+
+        num_nodes = source.shape[2]
+        init_state = self.encoder.init_hidden(source.shape[0], num_nodes)
         output, _ = self.encoder(source, init_state, self.node_embeddings)      #B, T, N, hidden
         output = output[:, -1:, :, :]                                   #B, 1, N, hidden
             
         #CNN based predictor
         output = self.end_conv((output))                         #B, T*C, N, 1
-        output = output.squeeze(-1).reshape(-1, self.horizon, self.output_dim, self.num_nodes)
+        output = output.squeeze(-1).reshape(-1, self.horizon, self.output_dim, num_nodes)
         output = output.permute(0, 1, 3, 2)                             #B, T, N, C
 
         return output

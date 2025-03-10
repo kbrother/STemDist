@@ -7,7 +7,6 @@ class gtnet(nn.Module):
         super(gtnet, self).__init__()
         self.gcn_true = gcn_true
         self.buildA_true = buildA_true
-        self.num_nodes = num_nodes
         self.dropout = dropout
         self.predefined_A = predefined_A
         self.filter_convs = nn.ModuleList()
@@ -83,7 +82,9 @@ class gtnet(nn.Module):
             self.skipE = nn.Conv2d(in_channels=residual_channels, out_channels=skip_channels, kernel_size=(1, 1), bias=True)
 
 
-        self.idx = torch.arange(self.num_nodes).to(device)
+    def set_feat(self, static_feat1, static_feat2):
+        self.gc.register_buffer("sf1", static_feat1)
+        self.gc.register_buffer("sf2", static_feat2)
 
 
     def forward(self, input, idx=None):
@@ -93,8 +94,8 @@ class gtnet(nn.Module):
         if self.seq_length<self.receptive_field:
             input = nn.functional.pad(input,(self.receptive_field-self.seq_length,0,0,0))
 
-
-
+        adp = self.gc()
+        '''
         if self.gcn_true:
             if self.buildA_true:
                 if idx is None:
@@ -103,7 +104,7 @@ class gtnet(nn.Module):
                     adp = self.gc(idx)
             else:
                 adp = self.predefined_A
-
+        '''
         x = self.start_conv(input)
         skip = self.skip0(F.dropout(input, self.dropout, training=self.training))
         for i in range(self.layers):

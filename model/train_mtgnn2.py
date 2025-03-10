@@ -9,7 +9,7 @@ from model.mtgnn_small import gtnet
 import torch.optim as optim
 import math
 
-# python -m model.train_mtgnn2 -de 1 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -35,7 +35,6 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
-
 
     model = gtnet(True, True, 1, num_nodes,
                   device, predefined_A=None,

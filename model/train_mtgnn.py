@@ -12,7 +12,7 @@ from scipy.io import loadmat
 import sys
 
 
-# python -m model.train_mtgnn -de 2 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn -de 1 -d ../data/METR-LA -lr 1e-2 -e 100
 # python -m model.train_mtgnn -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)

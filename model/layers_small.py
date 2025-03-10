@@ -150,29 +150,19 @@ class dilated_inception(nn.Module):
 
 
 class graph_constructor(nn.Module):
-    def __init__(self, nnodes, k, dim, device, alpha=3, static_feat1=None, static_feat2=None):
-        super(graph_constructor, self).__init__()
-        self.nnodes = nnodes
-        self.sf1 = static_feat1
-        self.sf2 = static_feat2        
-        if static_feat1 is None:
-            self.emb1 = nn.Embedding(nnodes, dim)
-            self.emb2 = nn.Embedding(nnodes, dim)
-            
+    def __init__(self, num_node, k, dim, device, alpha=3, static_feat1=None, static_feat2=None):
+        super(graph_constructor, self).__init__()              
         self.device = device
         self.k = k
         self.dim = dim
         self.alpha = alpha
-        
+        if static_feat1 is None:
+            self.sf1 = torch.nn.Parameter(torch.rand(num_node, 10))
+            self.sf2 = torch.nn.Parameter(torch.rand(num_node, 10))
+    
 
-    def forward(self, idx):
-        if self.sf1 is None:
-            nodevec1 = self.emb1(idx)
-            nodevec2 = self.emb2(idx)
-        else:
-            nodevec1 = self.sf1[idx]
-            nodevec2 = self.sf2[idx]
-        a = torch.mm(nodevec1, nodevec2.transpose(0,1))
+    def forward(self):
+        a = torch.mm(self.sf1, self.sf2.transpose(0,1))
         adj = F.relu(F.tanh(a))
         #mask = torch.zeros(idx.size(0), idx.size(0)).to(self.device)
         #mask.fill_(float('0'))
@@ -196,6 +186,7 @@ class graph_constructor(nn.Module):
         a = torch.mm(nodevec1, nodevec2.transpose(1,0))-torch.mm(nodevec2, nodevec1.transpose(1,0))
         adj = F.relu(torch.tanh(self.alpha*a))
         return adj
+        
 
 class graph_global(nn.Module):
     def __init__(self, nnodes, k, dim, device, alpha=3, static_feat=None):
