@@ -79,12 +79,7 @@ class gwnet(nn.Module):
             self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
             self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
             #self.nodevec2 = self.nodevec1.T
-        else:
-            #self.nodevec1 = nn.Parameter(node_vec1)
-            #self.nodevec2 = nn.Parameter(node_vec2.T)
-            self.nodevec1 = node_vec1.to(device)
-            self.nodevec2 = node_vec2.to(device)
-
+        
         for b in range(blocks):
             new_dilation = 1       
             for i in range(layers):
@@ -121,6 +116,11 @@ class gwnet(nn.Module):
         self.receptive_field = receptive_field
         
 
+    def set_node_embed(self, node_embed1, node_embed2):
+        self.register_buffer("nodevec1", node_embed1)
+        self.register_buffer("nodevec2", node_embed2)
+
+
     def forward(self, input):
         in_len = input.size(3)
         if in_len<self.receptive_field:
@@ -130,7 +130,7 @@ class gwnet(nn.Module):
         x = self.start_conv(x)
         skip = 0
 
-        adj = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec2)), dim=1)
+        adj = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec2.t())), dim=1)
         #adj = F.relu(F.tanh(torch.mm(self.nodevec1, self.nodevec2)))
         for i in range(self.blocks * self.layers):
             # Gated TCN
@@ -174,4 +174,24 @@ class gwnet(nn.Module):
             loss_sum += curr_loss.item()
             num_entry += num_curr_entry.item()               
         return loss_sum/num_entry
-    
+
+
+    def test_model2(self, embedding1, embedding2, dataloader, scaler):
+        loss_sum, num_entry = 0, 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valx = torch.tensor(x, device=self.device, dtype=torch.float)
+            val_embed1 = embedding1(valx[...,0])
+            val_embed1 = torch.mean(val_embed1, dim=0)
+            val_embed2 = embedding2(valx[...,0])
+            val_embed2 = torch.mean(val_embed2, dim=0)
+            self.set_node_embed(val_embed1, val_embed2)   
+        
+            valx = valx.transpose(1, 3)
+            valy = torch.tensor(y, device=self.device, dtype=torch.float)
+            valy = valy[:,:,:,0]
+            output = self.forward(valx).squeeze()
+            output = scaler.inverse_transform(output)
+            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
+            loss_sum += curr_loss.item()
+            num_entry += num_curr_entry.item()               
+        return loss_sum/num_entry

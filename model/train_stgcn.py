@@ -6,7 +6,7 @@ import util
 from tqdm import tqdm
 import random
 from model.stgcn import STGCN
-from model.node_embed import NodeEmbedding
+from model.node_embed import NodeEmbedding_rnn
 import torch.optim as optim
 import math
 import sys
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
 
-    embedding1 = NodeEmbedding(12, 256, 10).to(device)
-    embedding2 = NodeEmbedding(12, 256, 10).to(device)
+    embedding1 = NodeEmbedding_rnn(12, 256, 10).to(device)
+    embedding2 = NodeEmbedding_rnn(12, 256, 10).to(device)
     model = STGCN(num_nodes, in_dim, 12, 12) 
     model.to(device)
     #model.reset_parameters()

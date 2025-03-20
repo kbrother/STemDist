@@ -78,9 +78,9 @@ class gtnet(nn.Module):
                     self.gconv1.append(mixprop(conv_channels, residual_channels, gcn_depth, dropout, propalpha))              
 
                 if self.seq_length>self.receptive_field:
-                    self.norm.append(torch.nn.LayerNorm((residual_channels, 207, self.seq_length - rf_size_j + 1), elementwise_affine=layer_norm_affline))
+                    self.norm.append(torch.nn.LayerNorm((residual_channels, self.seq_length - rf_size_j + 1), elementwise_affine=layer_norm_affline))
                 else:
-                    self.norm.append(torch.nn.LayerNorm((residual_channels, 207, self.receptive_field - rf_size_j + 1), elementwise_affine=layer_norm_affline))
+                    self.norm.append(torch.nn.LayerNorm((residual_channels, self.receptive_field - rf_size_j + 1), elementwise_affine=layer_norm_affline))
 
                 new_dilation *= dilation_exponential
 
@@ -138,12 +138,12 @@ class gtnet(nn.Module):
                 x = self.residual_convs[i](x)
 
             x = x + residual[:, :, :, -x.size(3):]
+            '''
             # B x C X N x L'
             if idx is None:
                 x = self.norm[i](x)
             else:
                 x = self.norm[i](x)
-
             '''
             num_nodes = x.shape[2]
             num_channel = x.shape[1]
@@ -152,7 +152,6 @@ class gtnet(nn.Module):
             x = self.norm[i](x)
             x = x.reshape(-1, num_nodes, num_channel, num_l) #B x N X C X L'
             x = torch.transpose(x, 1, 2) 
-            '''
         
         skip = self.skipE(x) + skip
         x = F.relu(skip)
@@ -161,7 +160,7 @@ class gtnet(nn.Module):
         return x
 
     
-    def test_model(self, embedding1, embedding2, dataloader, scaler, device):
+    def test_model2(self, embedding1, embedding2, dataloader, scaler, device):
         loss_sum, num_entry = 0, 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):        
             valx = torch.tensor(x, device=device, dtype=torch.float)
@@ -180,3 +179,4 @@ class gtnet(nn.Module):
             loss_sum += curr_loss.item()
             num_entry += num_curr_entry.item()               
         return loss_sum/num_entry
+
