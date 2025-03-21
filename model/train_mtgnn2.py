@@ -6,13 +6,13 @@ import util
 from tqdm import tqdm
 import random
 from model.mtgnn import gtnet
-from model.node_embed import NodeEmbedding_rnn
+from model.node_embed import NodeEmbedding_tf_encoder
 import torch.optim as optim
 import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 2 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -39,8 +39,8 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
 
-    embedding1 = NodeEmbedding_rnn(12, 256, 10).to(device)
-    embedding2 = NodeEmbedding_rnn(12, 256, 10).to(device)
+    embedding1 = NodeEmbedding_tf_encoder(12, 512, 10, num_nodes, device).to(device)
+    embedding2 = NodeEmbedding_tf_encoder(12, 512, 10, num_nodes, device).to(device)
     model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
@@ -85,7 +85,3 @@ if __name__ == "__main__":
             val_mse = model.test_model2(embedding1, embedding2, dataloader['val_loader'], scaler, device)
             test_mse = model.test_model2(embedding1, embedding2, dataloader['test_loader'], scaler, device)            
             print(f'epoch: {i},  valid mse: {val_mse}, test mse: {test_mse}')
-
-            if min_loss > val_mse:
-                min_loss = val_mse
-                torch.save({'e1': embedding1.state_dict(), 'e2': embedding2.state_dict()}, "embedding.pth")
