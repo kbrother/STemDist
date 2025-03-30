@@ -173,6 +173,7 @@ class gtnet(nn.Module):
         val_embed2 = torch.empty((num_nodes, 10), dtype=torch.float, device=device)
         for it, x in enumerate(dataloader_ne.get_iterator()):
             x = torch.tensor(x, device=device, dtype=torch.float)
+            #print(x.shape)
             embed1 = embedding1(x)
             embed2 = embedding2(x)
             s_idx = it*dataloader_ne.batch_size
