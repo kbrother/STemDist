@@ -6,13 +6,13 @@ import util
 from tqdm import tqdm
 import random
 from model.mtgnn import gtnet
-from model.node_embed import NodeEmbedding_tf_encoder
+from model.node_embed import NodeEmbedding_rnn
 import torch.optim as optim
 import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 7 -d ../data/METR-LA -lr 1e-3 -e 100
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -20,6 +20,8 @@ if __name__ == "__main__":
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
+    parser.add_argument('-bne', '--batch_size_ne', type=int, default=10, help='batch size')
+    parser.add_argument('-sl', '--seq_len', type=int, default=12*24*7*6, help='sequence length')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
@@ -33,14 +35,15 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     dataloader = util.load_dataset(args.data, args.batch_size)
+    dataloader_ne = util.load_dataset_NE(args.data, args.batch_size_ne, args.seq_len)
     print("load finish")
     
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
 
-    embedding1 = NodeEmbedding_tf_encoder(12, 512, 10, num_nodes, device).to(device)
-    embedding2 = NodeEmbedding_tf_encoder(12, 512, 10, num_nodes, device).to(device)
+    embedding1 = NodeEmbedding_rnn(12*2, 256, 10).to(device)
+    embedding2 = NodeEmbedding_rnn(12*2, 256, 10).to(device)
     model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
@@ -57,15 +60,15 @@ if __name__ == "__main__":
         model.train()
         embedding1.train()
         embedding2.train()
-        dataloader['train_loader'].shuffle()
-        for iter, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())):
-            trainx = torch.tensor(x, device=device, dtype=torch.float)
-            train_embed1 = embedding1(trainx[...,0])
-            train_embed1 = torch.mean(train_embed1, dim=0)
-            train_embed2 = embedding2(trainx[...,0])
-            train_embed2 = torch.mean(train_embed2, dim=0)
+        dataloader['train_loader'].shuffle()           
+        for it, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())):
+            xx = dataloader_ne['train_loader'].get_item()
+            xx = torch.tensor(xx, device=device, dtype=torch.float)
+            train_embed1 = embedding1(xx)
+            train_embed2 = embedding2(xx)
             
-            model.set_node_embed(train_embed1, train_embed2)            
+            model.set_node_embed(train_embed1, train_embed2) 
+            trainx = torch.tensor(x, device=device, dtype=torch.float)                
             trainx = trainx.transpose(1, 3)
             trainy = torch.tensor(y, device=device, dtype=torch.float)
             trainy = trainy[:,:,:,0]
@@ -78,10 +81,11 @@ if __name__ == "__main__":
             curr_loss.backward()
             _optimizer.step()
 
+
         model.eval()
         embedding1.eval()
         embedding2.eval()
-        with torch.no_grad(): 
-            val_mse = model.test_model2(embedding1, embedding2, dataloader['val_loader'], scaler, device)
-            test_mse = model.test_model2(embedding1, embedding2, dataloader['test_loader'], scaler, device)            
+        with torch.no_grad():             
+            val_mse = model.test_model2(embedding1, embedding2, dataloader['val_loader'], dataloader_ne['val_loader'], scaler, device)
+            test_mse = model.test_model2(embedding1, embedding2, dataloader['test_loader'], dataloader_ne['test_loader'], scaler, device)    
             print(f'epoch: {i},  valid mse: {val_mse}, test mse: {test_mse}')

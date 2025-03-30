@@ -167,16 +167,23 @@ class gtnet(nn.Module):
         return loss_sum/num_entry
 
 
-    def test_model2(self, embedding1, embedding2, dataloader, scaler, device):
+    def test_model2(self, embedding1, embedding2, dataloader, dataloader_ne, scaler, device):
+        num_nodes = dataloader.xs.shape[2]        
+        val_embed1 = torch.empty((num_nodes, 10), dtype=torch.float, device=device)
+        val_embed2 = torch.empty((num_nodes, 10), dtype=torch.float, device=device)
+        for it, x in enumerate(dataloader_ne.get_iterator()):
+            x = torch.tensor(x, device=device, dtype=torch.float)
+            embed1 = embedding1(x)
+            embed2 = embedding2(x)
+            s_idx = it*dataloader_ne.batch_size
+            e_idx = s_idx + embed1.shape[0]
+            val_embed1[s_idx:e_idx, :] =embed1
+            val_embed2[s_idx:e_idx, :] = embed2
+
+        self.set_node_embed(val_embed1, val_embed2)
         loss_sum, num_entry = 0, 0
-        for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            valx = torch.tensor(x, device=device, dtype=torch.float)
-            val_embed1 = embedding1(valx[...,0])
-            val_embed1 = torch.mean(val_embed1, dim=0)
-            val_embed2 = embedding2(valx[...,0])
-            val_embed2 = torch.mean(val_embed2, dim=0)
-            self.set_node_embed(val_embed1, val_embed2)   
-            
+        for it, (x, y) in enumerate(dataloader.get_iterator()):
+            valx = torch.tensor(x, device=device, dtype=torch.float)            
             valx = valx.transpose(1, 3)
             valy = torch.tensor(y, device=device, dtype=torch.float)
             valy = valy[:,:,:,0]
@@ -188,20 +195,3 @@ class gtnet(nn.Module):
         return loss_sum/num_entry
 
     
-    def test_model3(self, embedding1, embedding2, dataloader, scaler, device):
-        loss_sum, num_entry = 0, 0
-        val_embed1 = embedding1()        
-        val_embed2 = embedding2()            
-        self.set_node_embed(val_embed1, val_embed2)          
-        
-        for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            valx = torch.tensor(x, device=device, dtype=torch.float) 
-            valx = valx.transpose(1, 3)
-            valy = torch.tensor(y, device=device, dtype=torch.float)
-            valy = valy[:,:,:,0]
-            output = self.forward(valx).squeeze()
-            output = scaler.inverse_transform(output)
-            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
-            loss_sum += curr_loss.item()
-            num_entry += num_curr_entry.item()               
-        return loss_sum/num_entry
