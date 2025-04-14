@@ -6,13 +6,13 @@ import util
 from tqdm import tqdm
 import random
 from model.mtgnn import gtnet
-from model.node_embed import NodeEmbedding_attn, NodeEmbedding_rnn, NodeEmbedding_node_rnn
+from model.node_embed import NodeEmbedding_rnn, NodeEmbedding_birnn, NodeEmbedding_attn
 import torch.optim as optim
 import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-3 -e 100
+# python -m model.train_mtgnn2 -de 7 -d ../data/METR-LA -lr 1e-3 -e 100
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -43,10 +43,13 @@ if __name__ == "__main__":
     in_dim = dataloader['train_loader'].xs.shape[3]
 
     max_seq = max(args.seq_len, dataloader['test_loader'].xs.shape[0])
-    embedding1 = NodeEmbedding_node_rnn(12, 512, 10).to(device)
-    embedding2 = NodeEmbedding_node_rnn(12, 512, 10).to(device)
-    #embedding1 = NodeEmbedding_rnn(12*2, 256, 10).to(device)
-    #embedding2 = NodeEmbedding_rnn(12*2, 256, 10).to(device)
+    #embedding1 = NodeEmbedding_rnn(12, 512, 10).to(device)
+    #embedding2 = NodeEmbedding_rnn(12, 512, 10).to(device)
+    #embedding1 = NodeEmbedding_birnn(12, 256, 10).to(device)
+    #embedding2 = NodeEmbedding_birnn(12, 256, 10).to(device)
+    embedding1 = NodeEmbedding_attn(12, 512, 10).to(device)
+    embedding2 = NodeEmbedding_attn(12, 512, 10).to(device)
+    
     model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
