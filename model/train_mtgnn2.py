@@ -45,10 +45,10 @@ if __name__ == "__main__":
     max_seq = max(args.seq_len, dataloader['test_loader'].xs.shape[0])
     #embedding1 = NodeEmbedding_rnn(12, 512, 10).to(device)
     #embedding2 = NodeEmbedding_rnn(12, 512, 10).to(device)
-    #embedding1 = NodeEmbedding_birnn(12, 256, 10).to(device)
-    #embedding2 = NodeEmbedding_birnn(12, 256, 10).to(device)
-    embedding1 = NodeEmbedding_attn(12, 512, 10).to(device)
-    embedding2 = NodeEmbedding_attn(12, 512, 10).to(device)
+    embedding1 = NodeEmbedding_birnn(12, 512, 10).to(device)
+    embedding2 = NodeEmbedding_birnn(12, 512, 10).to(device)
+    #embedding1 = NodeEmbedding_attn(12, 512, 10).to(device)
+    #embedding2 = NodeEmbedding_attn(12, 512, 10).to(device)
     
     model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=True,
