@@ -1,4 +1,5 @@
 from model.layers import *
+from model.node_embed import NodeEmbedding_rnn
 import util
 
 
@@ -87,14 +88,24 @@ class gtnet(nn.Module):
 
 
         self.idx = torch.arange(self.num_nodes).to(device)
+        if use_static_feat:
+            self.embedding1 = NodeEmbedding_rnn(seq_length, 512, node_dim)
+            self.embedding2 = NodeEmbedding_rnn(seq_length, 512, node_dim)
+        self.use_staic_feat = use_static_feat
+        
 
-
-    def forward(self, input, idx=None):
-        seq_len = input.size(3)
+    def embed_forward(self, _input):
+        node_embed1 = self.embedding1(_input)
+        node_embed2 = self.embedding2(_input)
+        self.set_node_embed(node_embed1, node_embed2)
+            
+    
+    def forward(self, _input, idx=None):            
+        seq_len = _input.size(3)
         assert seq_len==self.seq_length, 'input sequence length not equal to preset sequence length'
 
         if self.seq_length<self.receptive_field:
-            input = nn.functional.pad(input,(self.receptive_field-self.seq_length,0,0,0))
+            _input = nn.functional.pad(_input,(self.receptive_field-self.seq_length,0,0,0))
 
 
 
@@ -107,8 +118,8 @@ class gtnet(nn.Module):
             else:
                 adp = self.predefined_A
 
-        x = self.start_conv(input)
-        skip = self.skip0(F.dropout(input, self.dropout, training=self.training))
+        x = self.start_conv(_input)
+        skip = self.skip0(F.dropout(_input, self.dropout, training=self.training))
         for i in range(self.layers):
             residual = x
             filter = self.filter_convs[i](x)
