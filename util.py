@@ -62,7 +62,8 @@ class DataLoader(object):
         self.current_ind = 0
         self.size = len(xs)
         self.num_batch = math.ceil(self.size/self.batch_size)
-        self.xs = xs
+        self.xs = xs  # num series x 12 x num nodes x 2
+        self.xs_orig = xs
         self.ys = ys
 
 

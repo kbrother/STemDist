@@ -20,6 +20,19 @@ class NodeEmbedding_rnn(nn.Module):
         return F.relu(self.linear(h_n.squeeze()))  #   num node x rank
 
 
+class NodeEmbedding_node_rnn(nn.Module):
+    def __init__(self, input_size, hidden_size, rank):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.rnn = torch.nn.LSTM(input_size, hidden_size)
+        self.linear = nn.Linear(hidden_size, rank)
+
+    # X: num node x 24
+    def forward(self, X):
+        output, (h_n, c_n) = self.rnn(X)   #  (num node, hiddeen dim)
+        return F.relu(self.linear(output))  #   num node x rank
+
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super().__init__()
