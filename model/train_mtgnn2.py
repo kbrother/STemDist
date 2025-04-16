@@ -12,7 +12,7 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 1 -d ../data/METR-LA -lr 1e-3 -e 100
+# python -m model.train_mtgnn2 -de 6 -d ../data/METR-LA -lr 1e-3 -e 100 -us
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('-bne', '--batch_size_ne', type=int, default=10, help='batch size')
     parser.add_argument('-sl', '--seq_len', type=int, default=12*24*7, help='sequence length')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
+    parser.add_argument('-us', '--use_static_feat', action='store_true', help='true if using node embedding model')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     args = parser.parse_args()
@@ -44,7 +45,7 @@ if __name__ == "__main__":
 
     max_seq = max(args.seq_len, dataloader['test_loader'].xs.shape[0])    
     model = gtnet(True, True, 2, num_nodes, 
-                  device, predefined_A=None, use_static_feat=True,
+                  device, predefined_A=None, use_static_feat=args.use_static_feat,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=12, in_dim=in_dim, out_dim=12,
@@ -62,7 +63,8 @@ if __name__ == "__main__":
         model.train()        
         dataloader['train_loader'].shuffle()           
         for it, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())): 
-            model.embed_forward(xx)
+            if args.use_static_feat:
+                model.embed_forward(xx)
             trainx = torch.tensor(x, device=device, dtype=torch.float)                
             trainx = trainx.transpose(1, 3)
             trainy = torch.tensor(y, device=device, dtype=torch.float)
@@ -78,7 +80,8 @@ if __name__ == "__main__":
 
         model.eval()        
         with torch.no_grad():     
-            model.embed_forward(xx)            
+            if args.use_static_feat:
+                model.embed_forward(xx)            
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
             print(f'epoch: {i},  valid mse: {val_mse}, test mse: {test_mse}')
