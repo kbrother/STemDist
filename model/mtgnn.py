@@ -62,11 +62,17 @@ class gtnet(nn.Module):
                     self.gconv1.append(mixprop(conv_channels, residual_channels, gcn_depth, dropout, propalpha))
                     self.gconv2.append(mixprop(conv_channels, residual_channels, gcn_depth, dropout, propalpha))
 
+                
                 if self.seq_length>self.receptive_field:
                     self.norm.append(torch.nn.LayerNorm((residual_channels, self.seq_length - rf_size_j + 1),elementwise_affine=layer_norm_affline))
                 else:
                     self.norm.append(torch.nn.LayerNorm((residual_channels, self.receptive_field - rf_size_j + 1),elementwise_affine=layer_norm_affline))
-
+                '''
+                if self.seq_length>self.receptive_field:
+                    self.norm.append(torch.nn.LayerNorm((residual_channels, num_nodes, self.seq_length - rf_size_j + 1),elementwise_affine=layer_norm_affline))
+                else:
+                    self.norm.append(torch.nn.LayerNorm((residual_channels, num_nodes, self.receptive_field - rf_size_j + 1),elementwise_affine=layer_norm_affline))
+                '''
                 new_dilation *= dilation_exponential
 
         self.layers = layers
@@ -135,13 +141,13 @@ class gtnet(nn.Module):
                 x = self.gconv1[i](x, adp)+self.gconv2[i](x, adp.transpose(1,0))
             else:
                 x = self.residual_convs[i](x)
+            x = x + residual[:, :, :, -x.size(3):]            
 
-            x = x + residual[:, :, :, -x.size(3):]
             '''
             if idx is None:
-                x = self.norm[i](x,self.idx)
+                x = self.norm[i](x)
             else:
-                x = self.norm[i](x,idx)
+                x = self.norm[i](x)
             '''
             num_nodes = x.shape[2]
             num_channel = x.shape[1]
