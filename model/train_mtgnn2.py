@@ -12,7 +12,7 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 6 -d ../data/METR-LA -lr 1e-3 -e 100 -us
+# python -m model.train_mtgnn2 -de 5 -d ../data/METR-LA -lr 1e-3 -e 100 -us
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
