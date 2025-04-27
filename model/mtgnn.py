@@ -1,5 +1,5 @@
 from model.layers import *
-from model.node_embed import NodeEmbedding_rnn
+from model.node_embed import NodeEmbedding_rnn, NodeEmbedding_attn
 import util
 
 
@@ -93,7 +93,7 @@ class gtnet(nn.Module):
             self.skipE = nn.Conv2d(in_channels=residual_channels, out_channels=skip_channels, kernel_size=(1, 1), bias=True)
 
 
-        self.idx = torch.arange(self.num_nodes).to(device)
+        #self.idx = torch.arange(self.num_nodes).to(device)
         if use_static_feat:
             self.embedding1 = NodeEmbedding_rnn(seq_length, 512, node_dim)
             self.embedding2 = NodeEmbedding_rnn(seq_length, 512, node_dim)
@@ -113,8 +113,9 @@ class gtnet(nn.Module):
         if self.seq_length<self.receptive_field:
             _input = nn.functional.pad(_input,(self.receptive_field-self.seq_length,0,0,0))
 
-
-
+        idx = torch.arange(_input.shape[2]).to(_input.device)
+        adp = self.gc(idx)
+        '''
         if self.gcn_true:
             if self.buildA_true:
                 if idx is None:
@@ -123,7 +124,8 @@ class gtnet(nn.Module):
                     adp = self.gc(idx)
             else:
                 adp = self.predefined_A
-
+        '''
+        
         x = self.start_conv(_input)
         skip = self.skip0(F.dropout(_input, self.dropout, training=self.training))
         for i in range(self.layers):

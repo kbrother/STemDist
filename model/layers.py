@@ -228,8 +228,8 @@ class graph_constructor(nn.Module):
             nodevec1 = self.emb1(idx)
             nodevec2 = self.emb2(idx)
         else:
-            nodevec1 = self.nodevec1[idx,:]
-            nodevec2 = self.nodevec2[idx,:]
+            nodevec1 = self.nodevec1
+            nodevec2 = self.nodevec2
 
         nodevec1 = torch.tanh(self.alpha*self.lin1(nodevec1))
         nodevec2 = torch.tanh(self.alpha*self.lin2(nodevec2))

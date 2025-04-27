@@ -61,7 +61,7 @@ class DataLoader(object):
         self.batch_size = batch_size
         self.current_ind = 0
         self.size = len(xs)
-        self.num_batch = math.ceil(self.size/self.batch_size)
+        self.num_batch = math.ceil(self.size/self.batch_size)        
         self.xs = xs  # num series x 12 x num nodes x 2
         self.xs_orig = xs
         self.ys = ys
@@ -130,6 +130,14 @@ def load_dataset(dataset_dir, batch_size):
     # Data format
     for category in ['train', 'val', 'test']:
         data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
+
+    '''
+    permutation = np.random.permutation(data['x_train'].shape[2])
+    for category in ['train', 'val', 'test']:
+        data['x_' + category] = data['x_' + category][:,:,permutation,:]
+        data['y_' + category] = data['y_' + category][:,:,permutation,:]
+     '''
+    
     data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
     data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
