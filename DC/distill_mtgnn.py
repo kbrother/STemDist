@@ -189,7 +189,7 @@ class GradMatch:
                 print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
 
 
-# python -m DC.distill_mtgnn -de 7 -e 300 -sp results/dc_mtgnn_sr2e-2_nr1e-1_lr1e-2 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
+# python -m DC.distill_mtgnn -de 0 -e 300 -sp results/dc_mtgnn_sr2e-2_nr1e-1_lr1e-2 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     #device = torch.device(f"cpu")
-    dataloader =  util.load_dataset(args.data, 128)
+    dataloader =  util.load_dataset(args.data, args.batch_size)
     print("load finish")
 
     algo = GradMatch(dataloader, args, device)    

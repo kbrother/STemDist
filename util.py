@@ -133,10 +133,11 @@ def load_dataset(dataset_dir, batch_size):
 
     '''
     permutation = np.random.permutation(data['x_train'].shape[2])
+    print(permutation)
     for category in ['train', 'val', 'test']:
         data['x_' + category] = data['x_' + category][:,:,permutation,:]
         data['y_' + category] = data['y_' + category][:,:,permutation,:]
-     '''
+    '''
     
     data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)

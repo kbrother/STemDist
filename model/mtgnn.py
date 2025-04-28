@@ -1,5 +1,5 @@
 from model.layers import *
-from model.node_embed import NodeEmbedding_rnn, NodeEmbedding_attn
+from model.node_embed import *
 import util
 
 
@@ -95,8 +95,8 @@ class gtnet(nn.Module):
 
         #self.idx = torch.arange(self.num_nodes).to(device)
         if use_static_feat:
-            self.embedding1 = NodeEmbedding_rnn(seq_length, 512, node_dim)
-            self.embedding2 = NodeEmbedding_rnn(seq_length, 512, node_dim)
+            self.embedding1 = NodeEmbedding_mlp(seq_length, 512, node_dim)
+            self.embedding2 = NodeEmbedding_mlp(seq_length, 512, node_dim)
         self.use_staic_feat = use_static_feat
         
 
