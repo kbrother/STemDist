@@ -108,16 +108,20 @@ class NodeEmbedding_birnn(nn.Module):
 class NodeEmbedding_attn(nn.Module):
     def __init__(self, input_size, hidden_size, rank):
         super().__init__()
-        self.attn1 = nn.MultiheadAttention(hidden_size, 1)                
+        self.attn1 = nn.MultiheadAttention(hidden_size, 1)      
         self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, rank)
+        self.linear2 = nn.Linear(hidden_size, hidden_size)
+        self.linear3 = nn.Linear(hidden_size, rank)
+        self.layer_norm1 = nn.LayerNorm(hidden_size)
+        self.layer_norm2 = nn.LayerNorm(hidden_size)
 
-
+    
     def forward(self, X):
-        output = F.relu(self.linear1(X))
-        output, _ = self.attn1(output, output, output)
-        output = F.relu(output)
-        return F.relu(self.linear2(output))
+        X = F.relu(self.linear1(X))
+        H, _ = self.attn1(X, X, X)
+        H = self.layer_norm1(H + X)
+        output = self.layer_norm2(H + self.linear2(H))
+        return F.relu(self.linear3(output))
 
 
 class NodeEmbedding_mlp(nn.Module):
