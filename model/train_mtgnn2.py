@@ -12,7 +12,7 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 5 -d ../data/METR-LA -lr 1e-3 -e 100 -us
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-3 -e 100 -us -s 0
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -56,8 +56,8 @@ if __name__ == "__main__":
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     min_loss = sys.float_info.max
 
-    xx = np.mean(dataloader['train_loader'].xs_orig, axis=0)   # 12 x num nodes x 2
-    xx = np.transpose(xx, (1, 0, 2))[:,:,0]   # num_nodes x 12
+    xx = dataloader['train_loader'].xs_orig[:100, :, :, 0]   # 1000 x 12 x num nodes
+    xx = np.transpose(xx, (0, 2, 1))   # 1000 x num_nodes x 12
     xx = torch.tensor(xx, dtype=torch.float, device=device)    
     for i in range(args.epochs):
         model.train()        

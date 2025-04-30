@@ -121,16 +121,23 @@ class NodeEmbedding_attn(nn.Module):
         H, _ = self.attn1(X, X, X)
         H = self.layer_norm1(H + X)
         output = self.layer_norm2(H + self.linear2(H))
-        return F.relu(self.linear3(output))
+        output = F.relu(self.linear3(output)) 
+        return torch.mean(output, dim=0)
 
 
 class NodeEmbedding_mlp(nn.Module):
     def __init__(self, input_size, hidden_size, rank):
-        super().__init__()        
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, rank)
+        super().__init__()               
+        self.hidden_size = hidden_size
+        self.linear = nn.Linear(hidden_size, rank)
+        #self.rnn = nn.LSTM(input_size, hidden_size)
+        self.rnn = LSTMLayer(input_size, hidden_size)
 
-
+    # num series x num nodes x 12
     def forward(self, X):
-        output = F.relu(self.linear1(X))            
-        return F.relu(self.linear2(output))
+        #_, (h_n, c_n) = self.rnn(X)   # h_n: 1 x num_nodes x hidden
+        h0 = torch.zeros(X.shape[1], self.hidden_size, device=X.device, dtype=torch.float)
+        c0 = torch.zeros(X.shape[1], self.hidden_size, device=X.device, dtype=torch.float)
+        output, (h_n, c_n) = self.rnn(X, (h0, c0))   #  (num node, hidden dim)
+        output = F.relu(self.linear(h_n.squeeze()))         
+        return output
