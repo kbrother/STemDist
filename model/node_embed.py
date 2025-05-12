@@ -127,6 +127,17 @@ class NodeEmbedding_attn(nn.Module):
 
 class NodeEmbedding_mlp(nn.Module):
     def __init__(self, input_size, hidden_size, rank):
+        super().__init__()        
+        self.linear1 = nn.Linear(input_size, hidden_size)
+        self.linear2 = nn.Linear(hidden_size, rank)
+
+    def forward(self, X):
+        output = F.relu(self.linear1(X))            
+        return F.relu(self.linear2(output))
+
+
+class NodeEmbedding_rnn_mlp(nn.Module):
+    def __init__(self, input_size, hidden_size, rank):
         super().__init__()               
         self.hidden_size = hidden_size
         self.linear = nn.Linear(hidden_size, rank)
