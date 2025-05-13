@@ -4,7 +4,7 @@ import util
 
 
 class gtnet(nn.Module):
-    def __init__(self, gcn_true, buildA_true, gcn_depth, num_nodes, device, predefined_A=None, use_static_feat=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=32, residual_channels=32, skip_channels=64, end_channels=128, seq_length=12, in_dim=2, out_dim=12, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
+    def __init__(self, gcn_true, buildA_true, gcn_depth, num_nodes, device, predefined_A=None, use_static_feat=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=32, residual_channels=32, skip_channels=64, end_channels=128, seq_length=12, in_dim=2, out_dim=2, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
         super(gtnet, self).__init__()
         self.gcn_true = gcn_true
         self.buildA_true = buildA_true
@@ -19,6 +19,7 @@ class gtnet(nn.Module):
         self.gconv1 = nn.ModuleList()
         self.gconv2 = nn.ModuleList()
         self.norm = nn.ModuleList()
+        self.out_dim = out_dim
         self.start_conv = nn.Conv2d(in_channels=in_dim,
                                     out_channels=residual_channels,
                                     kernel_size=(1, 1))
@@ -81,7 +82,7 @@ class gtnet(nn.Module):
                                              kernel_size=(1,1),
                                              bias=True)
         self.end_conv_2 = nn.Conv2d(in_channels=end_channels,
-                                             out_channels=out_dim,
+                                             out_channels=out_dim*seq_length,
                                              kernel_size=(1,1),
                                              bias=True)
         if self.seq_length > self.receptive_field:
@@ -168,6 +169,10 @@ class gtnet(nn.Module):
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
+
+        if self.out_dim > 1:
+            #print(x.shape)
+            x = torch.reshape(x, (x.shape[0], x.shape[1]//self.out_dim, x.shape[2], self.out_dim))
         return x
 
 
@@ -177,18 +182,18 @@ class gtnet(nn.Module):
 
 
     def test_model(self, dataloader, scaler, device):
-        loss_sum, num_entry = 0, 0
+        loss_sum, _sum = 0, 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
             valx = valx.transpose(1, 3)
             valy = torch.tensor(y, device=device, dtype=torch.float)
-            valy = valy[:,:,:,0]
             output = self.forward(valx).squeeze()
             output = scaler.inverse_transform(output)
+            #valy = scaler.transform(valy)
             curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
             loss_sum += curr_loss.item()
-            num_entry += num_curr_entry.item()               
-        return loss_sum/num_entry
+            _sum += torch.sum(torch.square(valy))
+        return loss_sum/_sum
 
 
     

@@ -8,49 +8,6 @@ import math
 import random
 
 
-class DataLoader_NE_train:
-    def __init__(self, xs, length):
-        """
-        :param xs:
-        :param ys:
-        :param batch_size:
-        """
-        self.length = length
-        self.xs = xs      # num series x 12 x num nodes x 2
-
-    def get_item(self):
-        start_idx = random.randrange(0, self.xs.shape[0] - self.length + 1)
-        return self.xs[start_idx:start_idx + self.length]
-        
-    
-class DataLoader_NE_test(object):
-    def __init__(self, xs, batch_size):
-        """
-        :param xs:
-        :param ys:
-        :param batch_size:
-        """
-        self.batch_size = batch_size
-        self.current_ind = 0
-        self.size = xs.shape[2]
-        self.num_batch = math.ceil(self.size/self.batch_size)
-        self.xs = xs      # num series x 12 x num nodes x 2
-
-
-    def get_iterator(self):
-        self.current_ind = 0
-
-        def _wrapper():
-            while self.current_ind < self.num_batch:
-                start_ind = self.batch_size * self.current_ind
-                end_ind = min(self.size, self.batch_size * (self.current_ind + 1))
-                x_i = self.xs[:,:,start_ind: end_ind, :]
-                yield x_i
-                self.current_ind += 1
-
-        return _wrapper()
-
-
 class DataLoader(object):
     def __init__(self, xs, ys, batch_size):
         """
@@ -123,13 +80,23 @@ def load_dataset(dataset_dir, batch_size):
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
         data['x_' + category] = cat_data['x']
-        data['y_' + category] = cat_data['y']
-    scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
+        if cat_data['x'].shape[-1] <= 2:
+            data['y_' + category] = cat_data['y'][..., 0]
+        else:
+            data['y_' + category] = cat_data['y']
 
+    if data['x_train'].shape[-1] <= 2:
+        scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
+    else:
+        scaler = StandardScaler(mean=data['x_train'].mean(), std=data['x_train'].std())
     print(data['x_train'].shape)
+    
     # Data format
     for category in ['train', 'val', 'test']:
-        data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
+        if data['x_train'].shape[-1] <= 2:
+            data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
+        else:
+            data['x_' + category] = scaler.transform(data['x_' + category])
 
     '''
     permutation = np.random.permutation(data['x_train'].shape[2])
@@ -143,20 +110,6 @@ def load_dataset(dataset_dir, batch_size):
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
     data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
     data['scaler'] = scaler
-    return data
-
-
-def load_dataset_NE(dataset_dir, batch_size, seq_len):
-    data = {}
-    for category in ['train', 'val', 'test']:
-        cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
-        data['x_' + category] = cat_data['x']    
-
-    print(data['x_train'].shape)
-    # Data format
-    data['train_loader'] = DataLoader_NE_train(data['x_train'], seq_len)
-    data['val_loader'] = DataLoader_NE_test(data['x_val'], batch_size)
-    data['test_loader'] = DataLoader_NE_test(data['x_test'], batch_size)    
     return data
 
 

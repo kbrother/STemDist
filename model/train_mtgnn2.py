@@ -12,7 +12,10 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-3 -e 100 -us -s 0
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0
+# python -m model.train_mtgnn2 -de 0 -d ../data/ELECTRICITY -lr 1e-2 -e 100 -s 0 -sl 24
+# python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64
+# python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12
 # python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
@@ -21,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-bne', '--batch_size_ne', type=int, default=10, help='batch size')
-    parser.add_argument('-sl', '--seq_len', type=int, default=12*24*7, help='sequence length')
+    parser.add_argument('-sl', '--seq_len', type=int, default=12, help='sequence length')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-us', '--use_static_feat', action='store_true', help='true if using node embedding model')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
@@ -42,13 +45,16 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
+    if len(dataloader['train_loader'].ys.shape) == 4:        
+        out_dim = dataloader['train_loader'].ys.shape[3]
+    else: 
+        out_dim = 1
 
-    max_seq = max(args.seq_len, dataloader['test_loader'].xs.shape[0])    
     model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=args.use_static_feat,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
-                  seq_length=12, in_dim=in_dim, out_dim=12,
+                  seq_length=args.seq_len, in_dim=in_dim, out_dim=out_dim,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
     model.to(device)
     #model.reset_parameters()
@@ -56,8 +62,8 @@ if __name__ == "__main__":
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     min_loss = sys.float_info.max
 
-    xx = dataloader['train_loader'].xs_orig[:100, :, :, 0]   # 1000 x 12 x num nodes
-    xx = np.transpose(xx, (0, 2, 1))   # 1000 x num_nodes x 12
+    xx = np.mean(dataloader['train_loader'].xs_orig, axis=0)
+    xx = np.transpose(xx, (1, 0, 2))[:,:,0]   # num_nodes x 12
     xx = torch.tensor(xx, dtype=torch.float, device=device)    
     for i in range(args.epochs):
         model.train()        
@@ -67,8 +73,7 @@ if __name__ == "__main__":
                 model.embed_forward(xx)
             trainx = torch.tensor(x, device=device, dtype=torch.float)                
             trainx = trainx.transpose(1, 3)
-            trainy = torch.tensor(y, device=device, dtype=torch.float)
-            trainy = trainy[:,:,:,0]
+            trainy = torch.tensor(y, device=device, dtype=torch.float)          
             output = model(trainx).squeeze()
             output = scaler.inverse_transform(output)
             curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)
@@ -84,4 +89,4 @@ if __name__ == "__main__":
                 model.embed_forward(xx)            
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
-            print(f'epoch: {i},  valid mse: {val_mse}, test mse: {test_mse}')
+            print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
