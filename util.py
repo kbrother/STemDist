@@ -146,6 +146,17 @@ def masked_se(preds, labels, null_val):
     loss = loss * mask
     return torch.sum(loss), torch.sum(mask)
 
+
+def masked_se2(preds, labels, null_val, y_mean):
+    mask = (labels != null_val)
+    mask = mask.float()    
+    loss = torch.square(preds - labels)
+    naive_loss = torch.square(y_mean - labels)
+    loss = loss * mask
+    naive_loss = naive_loss * mask
+    return torch.sum(loss), torch.sum(naive_loss)
+
+
 def distance_wb(gwr, gws):
     shape = gwr.shape
 

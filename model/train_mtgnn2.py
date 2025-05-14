@@ -12,16 +12,17 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0
-# python -m model.train_mtgnn2 -de 0 -d ../data/ELECTRICITY -lr 1e-2 -e 100 -s 0 -sl 24
-# python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64
-# python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12
-# python -m model.train_mtgnn2 -d ../data/PEMS-BAY -de 0 -lr 1e-2 -e 100
+# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0 -sp results/METR-LA-1e-2.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/ELECTRICITY -lr 1e-3 -e 100 -s 0 -sl 24 -sp results/ELEC-1e-3.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64 -sp results/STOCK-1e-2.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/AIR-1e-2.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/PEMS-BAY-1e-2.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/METR-LA-1e-2', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-bne', '--batch_size_ne', type=int, default=10, help='batch size')
     parser.add_argument('-sl', '--seq_len', type=int, default=12, help='sequence length')
@@ -90,3 +91,5 @@ if __name__ == "__main__":
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
             print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
+            with open(args.save_path, "a") as f:
+                f.write(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}\n')

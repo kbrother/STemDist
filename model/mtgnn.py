@@ -1,6 +1,7 @@
 from model.layers import *
 from model.node_embed import *
 import util
+import numpy as np
 
 
 class gtnet(nn.Module):
@@ -182,7 +183,17 @@ class gtnet(nn.Module):
 
 
     def test_model(self, dataloader, scaler, device):
-        loss_sum, _sum = 0, 0
+        loss_sum, naive_loss_sum = 0, 0
+
+        y_mean = 0
+        num_entry = 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valy = torch.tensor(y, device=device, dtype=torch.float)
+            mask = (valy != 0.).float()            
+            num_entry += torch.sum(mask)
+            y_mean += torch.sum(valy * mask)
+        y_mean /= num_entry
+            
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
             valx = valx.transpose(1, 3)
@@ -190,10 +201,10 @@ class gtnet(nn.Module):
             output = self.forward(valx).squeeze()
             output = scaler.inverse_transform(output)
             #valy = scaler.transform(valy)
-            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
+            curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
             loss_sum += curr_loss.item()
-            _sum += torch.sum(torch.square(valy))
-        return loss_sum/_sum
+            naive_loss_sum += curr_naive_loss.item()
+        return loss_sum/naive_loss_sum
 
 
     
