@@ -191,7 +191,7 @@ class gtnet(nn.Module):
             valy = torch.tensor(y, device=device, dtype=torch.float)
             mask = (valy != 0.).float()            
             num_entry += torch.sum(mask)
-            y_mean += torch.sum(valy * mask)
+            y_mean += torch.sum(valy)
         y_mean /= num_entry
             
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
