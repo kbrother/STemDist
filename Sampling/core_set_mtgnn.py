@@ -4,10 +4,11 @@ import copy
 import sys
 import util
 import random
-from model.mtgnn_small import gtnet
+from model.mtgnn import gtnet
 from tqdm import tqdm
 import numpy as np
 import argparse
+import math
 
 
 class Coreset:
@@ -27,18 +28,22 @@ class Coreset:
 
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
+        seq_len = data['train_loader'].xs.shape[1]
         scaler = data['scaler']
-        _model = gtnet(True, True, 2, num_nodes,
-                  device, predefined_A=None,
+        if len(dataloader['train_loader'].ys.shape) == 4:        
+            out_dim = dataloader['train_loader'].ys.shape[3]
+        else: 
+            out_dim = 1
+        _model = gtnet(True, True, 2, num_nodes, 
+                  device, predefined_A=None, use_static_feat=False,
                   dropout=0.3, subgraph_size=20,
-                  node_dim=10, dilation_exponential=1,
-                  conv_channels=32, residual_channels=32,
-                  skip_channels=64, end_channels=128,
-                  seq_length=12, in_dim=in_dim, out_dim=12,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)  
+                  node_dim=10, dilation_exponential=1,             
+                  seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)    
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
+        
         for i in tqdm(range(300)):
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
@@ -52,7 +57,7 @@ class Coreset:
             _model.eval()
             if (i+1)%10 == 0:
                 with torch.no_grad():
-                    val_loss = _model.test_model(data['val_loader'], scaler, device)
+                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
                 if min_val_loss > val_loss:
                     min_i = i
@@ -64,7 +69,7 @@ class Coreset:
         _model.load_state_dict(min_params)
         _model.eval()
         with torch.no_grad():
-            test_loss = _model.test_model(data['test_loader'], scaler, device)
+            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
         return min_i, min_val_loss, test_loss
 
@@ -76,7 +81,7 @@ class RandomSample(Coreset):
         num_total = data['train_loader'].xs.shape[0]
         sampled_idx = random.sample(list(range(num_total)), self.num_elems)
         self.synx = self.data['train_loader'].xs[sampled_idx]
-        self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
+        self.syny = self.data['train_loader'].ys[sampled_idx]
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         print(f'x: {self.synx.shape}, y:{self.syny.shape}')
@@ -84,20 +89,19 @@ class RandomSample(Coreset):
     def train(self):
         min_i, val_loss, test_loss = self.test_syn()
         print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(self.args.save_path, 'a') as f:
-            f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
 
 
-# python -m Sampling.core_set_mtgnn -de 3 -s 0 -lr 1e-2 -r 1e-2
-# python -m Sampling.core_set_mtgnn -d ../data/PEMS-BAY -de 4 -s 0 -lr 1e-2 -r 3e-4
+# python -m Sampling.core_set_mtgnn -d ../data/METR-LA -de 0 -s 0 -lr 1e-2 -r 2e-3
+# python -m Sampling.core_set_mtgnn -d ../data/PEMS-BAY -de 0 -s 0 -lr 1e-2 -r 2e-3
+# python -m Sampling.core_set_mtgnn -d ../data/AIR_DATA -de 0 -s 0 -lr 1e-2 -r 2e-3
+# python -m Sampling.core_set_mtgnn -d ../data/ELECTRICITY -de 0 -s 0 -lr 1e-2 -r 2e-3
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-r', '--reduction_rate',type=float,default=1e-3,help='learning rate')
-    parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-b', '--batch_size', type=int, default=2**11, help='batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     args = parser.parse_args()
 
