@@ -28,7 +28,9 @@ class GradMatch:
         # Define condensed data
         num_series_total = data['train_loader'].xs.shape[0]
         num_nodes_total = data['train_loader'].xs.shape[2]
-        
+        num_seq = data['train_loader'].xs.shape[1]
+        num_feat = data['train_loader'].xs.shape[3]
+                
         sampled_idx1 = random.sample(list(range(num_series_total)), self.num_series)
         sampled_idx1.sort()
         sampled_idx2 = random.sample(list(range(num_nodes_total)), self.num_nodes)
@@ -36,7 +38,7 @@ class GradMatch:
         self.synx = self.data['train_loader'].xs[sampled_idx1][:,:,sampled_idx2,:]     
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         
-        self.syny = self.data['train_loader'].ys[sampled_idx1, :, :, 0][:,:,sampled_idx2]
+        self.syny = self.data['train_loader'].ys[sampled_idx1][:,:,sampled_idx2]
         self.syny = scaler.transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         
@@ -52,24 +54,33 @@ class GradMatch:
         synx = self.synx.detach().clone()
         syny = self.syny.detach().clone()
         
+        num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
-        num_nodes = dataloader['train_loader'].xs.shape[2]
+        seq_len = data['train_loader'].xs.shape[1]
         scaler = data['scaler']
+        if len(dataloader['train_loader'].ys.shape) == 4:        
+            out_dim = dataloader['train_loader'].ys.shape[3]
+        else: 
+            out_dim = 1
+            
         _model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
-                  seq_length=12, in_dim=in_dim, out_dim=12,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)  
+                  seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim)   
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max      
 
-        nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)
-        nm_input_real = np.transpose(nm_input_real, (1, 0, 2))[:,:,0]   # num_nodes x 12
+        nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
+        nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
         nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-        nm_input_syn = torch.mean(synx, dim=0)[...,0]   # 12 x num_nodes
-        nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x 12                
+        nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
+         
+        nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
+        nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
+        nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
         for i in tqdm(range(200)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
@@ -83,7 +94,7 @@ class GradMatch:
             if (i+1)%10 == 0:
                 with torch.no_grad():
                     _model.embed_forward(nm_input_real)
-                    val_loss = _model.test_model(data['val_loader'], scaler, device)
+                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
                 if min_val_loss > val_loss:
                     min_i = i
@@ -94,7 +105,7 @@ class GradMatch:
         _model.eval()
         with torch.no_grad():
             _model.embed_forward(nm_input_real)
-            test_loss = _model.test_model(data['test_loader'], scaler, device)
+            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
         return min_i, min_val_loss, test_loss
 
@@ -104,15 +115,23 @@ class GradMatch:
         data = self.data
         synx, syny = self.synx, self.syny
 
+        num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
-        num_nodes = dataloader['train_loader'].xs.shape[2]
+        seq_len = data['train_loader'].xs.shape[1]
         scaler = data['scaler']        
+        if len(dataloader['train_loader'].ys.shape) == 4:        
+            out_dim = dataloader['train_loader'].ys.shape[3]
+        else: 
+            out_dim = 1
+            
         min_val_loss = sys.float_info.max
         optimizer = torch.optim.Adam([synx, syny], lr=args.lr_feat)
 
-        nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)
-        nm_input_real = np.transpose(nm_input_real, (1, 0, 2))[:,:,0]   # num_nodes x 12
+        nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
+        nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
         nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
+        nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
+        
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()
             data['train_loader'].current_ind = 0            
@@ -120,8 +139,8 @@ class GradMatch:
                   device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
-                  seq_length=12, in_dim=in_dim, out_dim=12,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)   
+                  seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim)   
             model_params = list(_model.parameters())
             #_model.initialize()
             _model.to(self.device)
@@ -138,15 +157,16 @@ class GradMatch:
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                realy = realy[:,:,:,0]  # batch x seq len x num node
                 output_real_temp = _model(realx.transpose(1, 3)).squeeze()
                 output_real = scaler.inverse_transform(output_real_temp)
                 loss_real, num_real = util.masked_se(output_real, realy, 0.)
                 gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                 gw_real = [_.detach().clone() for _ in gw_real]
 
-                nm_input_syn = torch.mean(synx, dim=0)[...,0]   # 12 x num_nodes
-                nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x 12
+                nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
+                nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
+                nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
+                
                 _model.embed_forward(nm_input_syn)
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
                 loss_syn = F.mse_loss(output_syn, syny)
@@ -165,8 +185,9 @@ class GradMatch:
                     
                 num_il = 10
                 synx_in, syny_in = synx.detach(), syny.detach()     
-                nm_input_syn_in = torch.mean(synx_in, dim=0)[...,0]   # 12 x num_nodes
-                nm_input_syn_in = torch.transpose(nm_input_syn_in, 0, 1)  # num nodex x 12
+                nm_input_syn_in = torch.mean(synx_in, dim=0)   # seq_length x num_nodes x in_dim
+                nm_input_syn_in = torch.transpose(nm_input_syn_in, 0, 1)  # num nodex x seq_length x in_dim
+                nm_input_syn_in = torch.reshape(nm_input_syn_in, (self.num_nodes, -1))
                 for il in range(num_il):
                     optimizer_model.zero_grad()
                     _model.embed_forward(nm_input_syn_in)
@@ -174,7 +195,8 @@ class GradMatch:
                     loss_syn_in = F.mse_loss(output_syn_in, syny_in)
                     loss_syn_in.backward()
                     optimizer_model.step()
-                    
+
+            print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
             if (i+1) % 10 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
@@ -185,11 +207,15 @@ class GradMatch:
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()                    
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
-            else:
-                print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
+                  
 
 
-# python -m DC.distill_mtgnn -de 0 -e 300 -sp results/dc_mtgnn_sr2e-2_nr1e-1_lr1e-2 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
+# python -m DC.distill_mtgnn -de 0 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 1e-2 -nrr 0.2 -b 256 -ned 32
+# python -m DC.distill_mtgnn -de 2 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 256
+# python -m DC.distill_mtgnn -de 2 -d ../data/AIR_DATA -e 300 -sp results/dc_air_data_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
+# python -m DC.distill_mtgnn -de 6 -d ../data/ELECTRICITY -e 300 -sp results/dc_elec_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 16
+# python -m DC.distill_mtgnn -de 7 -d ../data/SOLAR -e 300 -sp results/dc_solar_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 128
+# python -m DC.distill_mtgnn -de 0 -d ../data/TRAFFIC -e 300 -sp results/dc_traffic_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 64 -ned 64
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -201,11 +227,9 @@ if __name__ == "__main__":
     parser.add_argument('-nrr', '--node_reduce_rate',type=float,default=1,help='learning rate')
     parser.add_argument('-srr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
+    parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
-    parser.add_argument('-sp', '--save_path', type=str, default='results/') 
-    parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
-    parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     
     args = parser.parse_args()
     

@@ -13,10 +13,12 @@ import sys
 
 
 # python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0 -sp results/METR-LA-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/ELECTRICITY -lr 1e-3 -e 100 -s 0 -sl 24 -sp results/ELEC-1e-3.txt
+# python -m model.train_mtgnn2 -de 3 -d ../data/ELECTRICITY -lr 1e-3 -e 100 -s 0 -sl 24 -sp results/ELEC-1e-3.txt 
 # python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64 -sp results/STOCK-1e-2.txt
 # python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/AIR-1e-2.txt
 # python -m model.train_mtgnn2 -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/PEMS-BAY-1e-2.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/SOLAR -lr 1e-2 -e 100 -s 0 -sl 6 -sp results/SOLAR-1e-2.txt
+# python -m model.train_mtgnn2 -de 0 -d ../data/TRAFFIC -lr 1e-2 -e 100 -s 0 -sl 24 -sp results/TRAFFIC-1e-2.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -64,8 +66,9 @@ if __name__ == "__main__":
     min_loss = sys.float_info.max
 
     xx = np.mean(dataloader['train_loader'].xs_orig, axis=0)
-    xx = np.transpose(xx, (1, 0, 2))[:,:,0]   # num_nodes x 12
+    xx = np.transpose(xx, (1, 0, 2))   # num_nodes x 12
     xx = torch.tensor(xx, dtype=torch.float, device=device)    
+    xx = torch.reshape(xx, (num_nodes, -1))
     for i in range(args.epochs):
         model.train()        
         dataloader['train_loader'].shuffle()           

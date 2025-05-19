@@ -5,7 +5,7 @@ import numpy as np
 
 
 class gtnet(nn.Module):
-    def __init__(self, gcn_true, buildA_true, gcn_depth, num_nodes, device, predefined_A=None, use_static_feat=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=32, residual_channels=32, skip_channels=64, end_channels=128, seq_length=12, in_dim=2, out_dim=2, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True):
+    def __init__(self, gcn_true, buildA_true, gcn_depth, num_nodes, device, predefined_A=None, use_static_feat=None, dropout=0.3, subgraph_size=20, node_dim=40, dilation_exponential=1, conv_channels=32, residual_channels=32, skip_channels=64, end_channels=128, seq_length=12, in_dim=2, out_dim=2, layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=128):
         super(gtnet, self).__init__()
         self.gcn_true = gcn_true
         self.buildA_true = buildA_true
@@ -97,11 +97,13 @@ class gtnet(nn.Module):
 
         #self.idx = torch.arange(self.num_nodes).to(device)
         if use_static_feat:
-            #self.embedding1 = NodeEmbedding_attn(seq_length, 96, node_dim)
-            #self.embedding2 = NodeEmbedding_attn(seq_length, 96, node_dim)
+            self.embedding1 = NodeEmbedding_attn(seq_length*in_dim, ne_dim, node_dim)
+            self.embedding2 = NodeEmbedding_attn(seq_length*in_dim, ne_dim, node_dim)
 
-            self.embedding1 = NodeEmbedding_mlp(seq_length, 512, node_dim)
-            self.embedding2 = NodeEmbedding_mlp(seq_length, 512, node_dim)
+            #self.embedding1 = NodeEmbedding_mlp(in_dim*seq_length, ne_dim, node_dim)
+            #self.embedding2 = NodeEmbedding_mlp(in_dim*seq_length, ne_dim, node_dim)
+            #self.embedding1 = NodeEmbedding_mlp2(in_dim*seq_length, node_dim)
+            #self.embedding2 = NodeEmbedding_mlp2(in_dim*seq_length, node_dim)
             #self.embedding1 = NodeEmbedding_rnn(seq_length, 64, node_dim)
             #self.embedding2 = NodeEmbedding_rnn(seq_length, 64, node_dim)
         self.use_staic_feat = use_static_feat
@@ -205,6 +207,3 @@ class gtnet(nn.Module):
             loss_sum += curr_loss.item()
             naive_loss_sum += curr_naive_loss.item()
         return loss_sum/naive_loss_sum
-
-
-    

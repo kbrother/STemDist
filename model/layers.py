@@ -238,7 +238,8 @@ class graph_constructor(nn.Module):
         adj = F.relu(torch.tanh(self.alpha*a))
         mask = torch.zeros(idx.size(0), idx.size(0)).to(self.device)
         mask.fill_(float('0'))
-        s1,t1 = (adj + torch.rand_like(adj)*0.01).topk(self.k,1)
+        _k = min(self.k, adj.shape[0])
+        s1,t1 = (adj + torch.rand_like(adj)*0.01).topk(_k,1)
         mask.scatter_(1,t1,s1.fill_(1))
         adj = adj*mask
         return adj
