@@ -66,6 +66,7 @@ class LSTMLayer(jit.ScriptModule):
         return torch.stack(outputs), state
 
 
+    
 class NodeEmbedding_rnn(nn.Module):
     def __init__(self, input_size, hidden_size, rank):
         super().__init__()
@@ -108,7 +109,7 @@ class NodeEmbedding_birnn(nn.Module):
 class NodeEmbedding_attn(nn.Module):
     def __init__(self, input_size, hidden_size, rank):
         super().__init__()
-        self.attn1 = nn.MultiheadAttention(hidden_size, 2)      
+        self.attn1 = nn.MultiheadAttention(hidden_size, 1)      
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, rank)
         self.layer_norm1 = nn.LayerNorm(hidden_size)
@@ -126,6 +127,7 @@ class NodeEmbedding_mlp(nn.Module):
         super().__init__()        
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, rank)
+        #self.linear = nn.Linear(input_size, rank)
 
     def forward(self, X):
         output = F.relu(self.linear1(X))            
