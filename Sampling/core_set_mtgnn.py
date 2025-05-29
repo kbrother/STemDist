@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 import argparse
 import math
+import time
 
 
 class Coreset:
@@ -43,8 +44,10 @@ class Coreset:
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
-        
-        for i in tqdm(range(300)):
+
+        time_sum = 0
+        for i in tqdm(range(200)):
+            start_time = time.time()
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
             output_syn = scaler.inverse_transform(output_syn)
@@ -54,6 +57,7 @@ class Coreset:
             loss_syn.backward()
             optimizer.step()
 
+            time_sum += time.time() - start_time
             _model.eval()
             if (i+1)%10 == 0:
                 with torch.no_grad():
@@ -71,7 +75,7 @@ class Coreset:
         with torch.no_grad():
             test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
-        return min_i, min_val_loss, test_loss
+        return min_i, min_val_loss, test_loss, time_sum
 
 
 class RandomSample(Coreset):
@@ -85,18 +89,16 @@ class RandomSample(Coreset):
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         print(f'x: {self.synx.shape}, y:{self.syny.shape}')
-    
-    def train(self):
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
 
 
-# python -m Sampling.core_set_mtgnn -d ../data/METR-LA -de 0 -s 0 -lr 1e-2 -r 2e-3
+
+# python -m Sampling.core_set_mtgnn -d ../data/METR-LA -de 1 -s 0 -lr 1e-2 -r 2e-3
 # python -m Sampling.core_set_mtgnn -d ../data/PEMS-BAY -de 0 -s 0 -lr 1e-2 -r 2e-3
 # python -m Sampling.core_set_mtgnn -d ../data/AIR-DATA -de 0 -s 0 -lr 1e-2 -r 2e-3
 # python -m Sampling.core_set_mtgnn -d ../data/ELECTRICITY -de 1 -s 0 -lr 1e-2 -r 2e-3
 # python -m Sampling.core_set_mtgnn -d ../data/SOLAR -de 2 -s 0 -lr 1e-3 -r 2e-3
-# python -m Sampling.core_set_mtgnn -d ../data/TRAFFIC -de 2 -s 0 -lr 1e-3 -r 2e-3
+# python -m Sampling.core_set_mtgnn -d ../data/TRAFFIC -de 1 -s 0 -lr 1e-3 -r 2e-3
+# python -m Sampling.core_set_mtgnn -d ../data/PEMS07 -de 1 -s 0 -lr 1e-3 -r 2e-3
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
@@ -118,5 +120,6 @@ if __name__ == '__main__':
     print("load finish")
 
     _model = RandomSample(dataloader, args, device)
-    min_i, min_val_loss, test_loss = _model.test_syn()
-    print(f"min i: {min_i}, min val loss: {min_val_loss}, test loss: {test_loss}")
+    min_i, min_val_loss, test_loss, time_sum = _model.test_syn()
+    mem_use = torch.cuda.memory_allocated(device)
+    print(f"min i: {min_i}, min val loss: {min_val_loss}, test loss: {test_loss}, time sum: {time_sum}, mem: {mem_use}")

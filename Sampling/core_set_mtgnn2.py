@@ -10,6 +10,7 @@ import numpy as np
 import argparse
 import math
 import torch.nn.functional as F
+import time
 
 
 class Coreset:
@@ -54,7 +55,9 @@ class Coreset:
         nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
         nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
+        time_sum = 0
         for i in tqdm(range(200)):  
+            start_time = time.time()
             _model.train()
             _model.embed_forward(nm_input_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()
@@ -62,6 +65,7 @@ class Coreset:
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
+            time_sum += time.time() - start_time
 
             _model.eval()
             if (i+1)%10 == 0:
@@ -80,7 +84,7 @@ class Coreset:
             _model.embed_forward(nm_input_real)
             test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
-        return min_i, min_val_loss, test_loss
+        return min_i, min_val_loss, test_loss, time_sum
 
 
 class RandomSample(Coreset):
@@ -104,18 +108,15 @@ class RandomSample(Coreset):
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         
         print(f'x: {self.synx.shape}, y:{self.syny.shape}')
-    
-    def train(self):
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
 
 
-# python -m Sampling.core_set_mtgnn2 -d ../data/METR-LA -de 0 -s 0 -lr 1e-3 -srr 2e-2 -nrr 1e-1 -ned 128
+# python -m Sampling.core_set_mtgnn2 -d ../data/METR-LA -de 1 -s 0 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 32
 # python -m Sampling.core_set_mtgnn2 -d ../data/PEMS-BAY -de 0 -s 0 -lr 1e-2 -srr 1e-2 -nrr 0.2 -ned 128
-# python -m Sampling.core_set_mtgnn2 -d ../data/AIR-DATA -de 0 -s 0 -lr 1e-2 -r 2e-3
-# python -m Sampling.core_set_mtgnn2 -d ../data/ELECTRICITY -de 6 -s 0 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 128
-# python -m Sampling.core_set_mtgnn2 -d ../data/SOLAR -de 7 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 128
-# python -m Sampling.core_set_mtgnn2 -d ../data/TRAFFIC -de 7 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 128
+# python -m Sampling.core_set_mtgnn2 -d ../data/AIR-DATA -de 0 -s 0 -lr 1e-2 -srr 1e-2 -nrr 0.2 -ned 32
+# python -m Sampling.core_set_mtgnn2 -d ../data/ELECTRICITY -de 1 -s 0 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 16
+# python -m Sampling.core_set_mtgnn2 -d ../data/SOLAR -de 7 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 32
+# python -m Sampling.core_set_mtgnn2 -d ../data/TRAFFIC -de 1 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 64
+# python -m Sampling.core_set_mtgnn2 -d ../data/PEMS07 -de 0 -lr 1e-3 -srr 1e-2 -nrr 2e-1 -ned 32
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
@@ -139,5 +140,6 @@ if __name__ == '__main__':
     print("load finish")
 
     _model = RandomSample(dataloader, args, device)
-    min_i, min_val_loss, test_loss = _model.test_syn()
-    print(f"min i: {min_i}, min val loss: {min_val_loss}, test loss: {test_loss}")
+    min_i, min_val_loss, test_loss, time_sum = _model.test_syn()
+    mem_use = torch.cuda.memory_allocated(device)/10**6
+    print(f"min i: {min_i}, min val loss: {min_val_loss}, test loss: {test_loss}, time sum: {time_sum}, mem: {mem_use}")

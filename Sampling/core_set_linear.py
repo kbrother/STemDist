@@ -8,6 +8,7 @@ from model.linear import Linear
 from tqdm import tqdm
 import numpy as np
 import argparse
+import torch.nn.functional as F
 
 
 class Coreset:
@@ -28,14 +29,10 @@ class Coreset:
         num_nodes = data['train_loader'].xs.shape[2]
         in_dim = data['train_loader'].xs.shape[3]
         scaler = data['scaler']
-        _model = Linear(args, in_dim)
+        input_len = data['train_loader'].xs.shape[1]
+        output_len = input_len
+        _model = Linear(args, input_len, output_len, in_dim)
         _model.to(self.device)
-        for p in _model.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
-    
         
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.learning_rate)
         min_val_loss = sys.float_info.max
@@ -43,8 +40,9 @@ class Coreset:
             _model.train()
             output_syn = _model(synx)
             output_syn = scaler.inverse_transform(output_syn)
-            loss_syn, num_val_entry = util.masked_se(output_syn, syny, 0.)
-            loss_syn /= num_val_entry
+            #loss_syn, num_val_entry = util.masked_se(output_syn, syny, 0.)
+            #loss_syn /= num_val_entry
+            loss_syn = F.mse_loss(output_syn, syny)
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
@@ -75,19 +73,17 @@ class RandomSample(Coreset):
         num_total = data['train_loader'].xs.shape[0]
         sampled_idx = random.sample(list(range(num_total)), self.num_elems)
         self.synx = self.data['train_loader'].xs[sampled_idx]
-        self.syny = self.data['train_loader'].ys[sampled_idx, :, :, 0]
+        self.syny = self.data['train_loader'].ys[sampled_idx, :, :]
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         print(f'x: {self.synx.shape}, y:{self.syny.shape}')
-    
-    def train(self):
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(self.args.save_path, 'a') as f:
-            f.write(f"min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")        
 
 
-# python -m Sampling.core_set_glinear -d ../data/METR-LA -de 0 -s 0 -lr 1e-3 -r 3e-4
+# python -m Sampling.core_set_linear -d ../data/METR-LA -de 1 -s 0 -lr 1e-1 -r 2e-3
+# python -m Sampling.core_set_linear -d ../data/PEMS-BAY -de 1 -s 0 -lr 1e-1 -r 2e-3
+# python -m Sampling.core_set_linear -d ../data/ELECTRICITY -de 1 -s 0 -lr 1e-1 -r 2e-3
+# python -m Sampling.core_set_linear -d ../data/SOLAR -de 1 -s 0 -lr 1e-1 -r 2e-3
+# python -m Sampling.core_set_linear -d ../data/TRAFFIC -de 1 -s 0 -lr 1 -r 2e-3
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
@@ -96,9 +92,6 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--reduction_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
-    parser.add_argument('-ru', '--rnn_units', type=int, default=2**6, help='rnn hidden unit')
-    parser.add_argument('-ed', '--embed_dim', default=10, type=int)
-    parser.add_argument('-lp', '--load_path', type=str, default='../data/params/METR-LA-grnn/node.pt')
     args = parser.parse_args()
 
     # random seed setting
