@@ -157,8 +157,7 @@ class GradMatch:
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                output_real_temp = _model(realx.transpose(1, 3)).squeeze()
-                output_real = scaler.inverse_transform(output_real_temp)
+                output_real = _model(realx.transpose(1, 3)).squeeze()                
                 loss_real, num_real = util.masked_se(output_real, realy, 0.)
                 gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                 gw_real = [_.detach().clone() for _ in gw_real]

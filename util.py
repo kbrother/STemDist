@@ -75,37 +75,16 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def load_dataset(dataset_dir, batch_size):
+def load_dataset_old(dataset_dir, batch_size):
     data = {}
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
         data['x_' + category] = cat_data['x']
-        if cat_data['x'].shape[-1] <= 2:
-            data['y_' + category] = cat_data['y'][..., 0]
-        else:
-            data['y_' + category] = cat_data['y']
+        data['y_' + category] = cat_data['y'][..., 0]
 
-    if data['x_train'].shape[-1] <= 2:
-        scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
-    else:
-        scaler = StandardScaler(mean=data['x_train'].mean(), std=data['x_train'].std())
-    print(data['x_train'].shape)
-    
-    # Data format
-    for category in ['train', 'val', 'test']:
-        if data['x_train'].shape[-1] <= 2:
-            data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
-        else:
-            data['x_' + category] = scaler.transform(data['x_' + category])
-
-    '''
-    permutation = np.random.permutation(data['x_train'].shape[2])
-    print(permutation)
-    for category in ['train', 'val', 'test']:
-        data['x_' + category] = data['x_' + category][:,:,permutation,:]
-        data['y_' + category] = data['y_' + category][:,:,permutation,:]
-    '''
-    
+    scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
+    data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
+            
     data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
     data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
@@ -113,6 +92,20 @@ def load_dataset(dataset_dir, batch_size):
     return data
 
 
+def load_dataset(dataset_dir, batch_size):
+    data = {}
+    for category in ['train', 'val', 'test']:
+        cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
+        data['x_' + category] = cat_data['x']
+        data['y_' + category] = cat_data['y'][..., 0]
+        
+    data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
+    data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
+    data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
+    data['scaler'] = None
+    return data
+
+    
 def masked_mae(preds, labels, null_val):
     mask = (labels != null_val)
     mask = mask.float()

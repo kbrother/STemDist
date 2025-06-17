@@ -104,7 +104,7 @@ class RandomSample(Coreset):
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)
         
         self.syny = self.data['train_loader'].ys[sampled_idx1][:,:,sampled_idx2]
-        self.syny = data['scaler'].transform(self.syny)
+        #self.syny = data['scaler'].transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
         
         print(f'x: {self.synx.shape}, y:{self.syny.shape}')
