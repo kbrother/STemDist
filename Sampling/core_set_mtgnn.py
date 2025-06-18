@@ -50,7 +50,7 @@ class Coreset:
             start_time = time.time()
             _model.train()
             output_syn = _model(synx.transpose(1, 3)).squeeze()
-            #output_syn = scaler.inverse_transform(output_syn)
+            output_syn = scaler.inverse_transform(output_syn)
             loss_syn, num_val_entry = util.masked_se(output_syn, syny, 0.)
             loss_syn /= num_val_entry
             optimizer.zero_grad()
