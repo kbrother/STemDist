@@ -75,34 +75,24 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def load_dataset_old(dataset_dir, batch_size):
-    data = {}
-    for category in ['train', 'val', 'test']:
-        cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
-        data['x_' + category] = cat_data['x']
-        data['y_' + category] = cat_data['y'][..., 0]
-
-    scaler = StandardScaler(mean=data['x_train'][..., 0].mean(), std=data['x_train'][..., 0].std())
-    data['x_' + category][..., 0] = scaler.transform(data['x_' + category][..., 0])
-            
-    data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
-    data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
-    data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
-    data['scaler'] = scaler
-    return data
-
-
 def load_dataset(dataset_dir, batch_size):
     data = {}
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
         data['x_' + category] = cat_data['x']
         data['y_' + category] = cat_data['y'][..., 0]
-        
+
+    num_feat = data['x_train'].shape[-1]
+    scaler_list = []
+    for i in range(num_feat):
+        scaler_list.append(StandardScaler(mean=data['x_train'][..., i].mean(), std=data['x_train'][..., i].std()))    
+        for category in ['train', 'val', 'test']:
+            data['x_' + category][..., i] = scaler_list[i].transform(data['x_' + category][..., i])
+            
     data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
     data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
-    data['scaler'] = None
+    data['scaler'] = scaler_list[0]
     return data
 
     

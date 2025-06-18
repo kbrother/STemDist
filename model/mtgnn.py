@@ -201,6 +201,7 @@ class gtnet(nn.Module):
             valx = valx.transpose(1, 3)
             valy = torch.tensor(y, device=device, dtype=torch.float)
             output = self.forward(valx).squeeze()            
+            output = scaler.inverse_transform(output)
             curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
             loss_sum += curr_loss.item()
             naive_loss_sum += curr_naive_loss.item()

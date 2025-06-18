@@ -78,6 +78,8 @@ class Coreset:
                     min_val_loss = val_loss
                     min_params = copy.deepcopy(_model.state_dict())
 
+                print(f"epoch: {i+1}, val loss: {val_loss}")
+
         _model.load_state_dict(min_params)
         _model.eval()
         with torch.no_grad():

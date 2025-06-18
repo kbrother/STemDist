@@ -157,7 +157,8 @@ class GradMatch:
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                output_real = _model(realx.transpose(1, 3)).squeeze()                
+                output_real_temp = _model(realx.transpose(1, 3)).squeeze()                
+                output_real = scaler.inverse_transform(output_real_temp)
                 loss_real, num_real = util.masked_se(output_real, realy, 0.)
                 gw_real = torch.autograd.grad(loss_real/num_real, model_params, retain_graph=True)
                 gw_real = [_.detach().clone() for _ in gw_real]
@@ -196,7 +197,7 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 10 == 0:                
+            if (i+1) % 5 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
