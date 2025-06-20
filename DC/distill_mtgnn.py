@@ -46,7 +46,12 @@ class GradMatch:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
-        
+
+        min_i, val_loss, test_loss = self.test_syn()
+        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        with open(args.save_path + ".txt", 'a') as f:
+            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
+
         
     def test_syn(self):
         args = self.args
@@ -197,7 +202,7 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 5 == 0:                
+            if (i+1) % 4 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
