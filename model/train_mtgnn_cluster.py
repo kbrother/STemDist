@@ -12,7 +12,7 @@ import math
 import sys
 
 
-# python -m model.train_mtgnn_cluster -de 2 -d ../data/GLA -lr 1e-2 -e 100 -s 0 -r 0.1 -sp results/gla_cluster_1e-2.txt
+# python -m model.train_mtgnn_cluster -de 2 -d ../data/GLA -lr 1e-3 -e 100 -s 0 -r 0.1 -ned 32 -b 128 -sp results/gla_cluster_1e-3.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -25,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-r', '--ratio', type=float, default=1)
+    parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
     args = parser.parse_args()
     
     # random seed setting
@@ -53,7 +54,7 @@ if __name__ == "__main__":
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim)      
     model.to(device)
     #model.reset_parameters()
 
