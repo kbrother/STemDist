@@ -6,6 +6,7 @@ import torch
 from scipy.sparse import linalg
 import math
 import random
+from sklearn.cluster import KMeans
 
 
 class DataLoader(object):
@@ -59,6 +60,36 @@ class DataLoader(object):
         return (x_i, y_i)
 
 
+class DataLoaderCluster(DataLoader):
+    def __init__(self, xs, ys, batch_size, num_clusters):
+        self.batch_size = batch_size
+        self.current_ind = 0
+        self.size = len(xs)
+        self.num_batch = math.ceil(self.size/self.batch_size)        
+
+        # num series x 12 x num nodes x 2
+        self.xs_orig = xs
+        xs = np.transpose(xs, (2, 0, 1, 3))  # num nodes x num sereis x 12 x 2
+        num_nodes, num_series = xs.shape[0], xs.shape[1]
+        seq_len, num_feat = xs.shape[2], xs.shape[3]
+        xs = np.reshape(xs, (num_nodes, -1))   # num nodes x ... 
+        kmeans = KMeans(n_clusters=num_clusters).fit(xs)
+        xs = kmeans.cluster_centers_  # num nodes x ...
+        xs = np.reshape(xs, (num_clusters, num_series, seq_len, num_feat))
+        xs = np.transpose(xs, (1,2,0,3))
+        
+        self.xs = xs        
+        self.ys = np.zeros((num_series, seq_len, num_clusters))
+        label_cnt = [0 for _ in range(num_clusters)]
+        for i in range(num_nodes):
+            self.ys[:, :, kmeans.labels_[i]] = self.ys[:, :, kmeans.labels_[i]] + ys[:, :, i]
+            label_cnt[kmeans.labels_[i]] += 1
+
+        self.label_cnt = label_cnt
+        for i in range(num_clusters):
+            self.ys[:,:,i] = self.ys[:,:,i]/label_cnt[i]
+            
+
 class StandardScaler():
     """
     Standard the input
@@ -75,7 +106,7 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def load_dataset(dataset_dir, batch_size):
+def load_dataset(dataset_dir, batch_size, do_cluster=False, _ratio=1.0):
     data = {}
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
@@ -88,8 +119,13 @@ def load_dataset(dataset_dir, batch_size):
         scaler_list.append(StandardScaler(mean=data['x_train'][..., i].mean(), std=data['x_train'][..., i].std()))    
         for category in ['train', 'val', 'test']:
             data['x_' + category][..., i] = scaler_list[i].transform(data['x_' + category][..., i])
-            
-    data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
+
+    if do_cluster:
+        num_clusters = round(_ratio * data['x_train'].shape[2])
+        data['train_loader'] = DataLoaderCluster(data['x_train'], data['y_train'], batch_size, num_clusters)
+    else:
+        data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
+
     data['val_loader'] = DataLoader(data['x_val'], data['y_val'], batch_size)
     data['test_loader'] = DataLoader(data['x_test'], data['y_test'], batch_size)
     data['scaler'] = scaler_list[0]
