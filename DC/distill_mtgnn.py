@@ -20,8 +20,8 @@ class GradMatch:
         self.data = data
         self.args = args
         self.device = device
-        self.num_series = int(args.series_reduce_rate * data['train_loader'].xs.shape[0])
-        self.num_nodes = int(args.node_reduce_rate * data['train_loader'].xs.shape[2])
+        self.num_series = round(args.series_reduce_rate * data['train_loader'].xs.shape[0])
+        self.num_nodes = round(args.node_reduce_rate * data['train_loader'].xs.shape[2])
         scaler = data['scaler']
         
         # Define condensed data
@@ -202,7 +202,7 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 4 == 0:                
+            if (i+1) % 5 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:

@@ -84,11 +84,17 @@ class GradMatchCluster:
         nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
         nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
+
+        _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
+        _weight = _weight / torch.sum(_weight)
+        _weight = _weight.unsqueeze(0).unsqueeze(0)
         for i in tqdm(range(200)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()
-            loss_syn = F.mse_loss(output_syn, syny)
+            #loss_syn = F.mse_loss(output_syn, syny)
+            loss_syn = torch.square(output_syn - syny) * _weight
+            loss_syn = torch.mean(loss_syn)
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
@@ -176,7 +182,9 @@ class GradMatchCluster:
                 
                 _model.embed_forward(nm_input_syn)
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
-                loss_syn = F.mse_loss(output_syn, syny)
+                #loss_syn = F.mse_loss(output_syn, syny)
+                loss_syn = torch.square(output_syn - syny) * _weight
+                loss_syn = torch.mean(loss_syn)
                 gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
                 
                 #pbar.close()
@@ -199,7 +207,9 @@ class GradMatchCluster:
                     optimizer_model.zero_grad()
                     _model.embed_forward(nm_input_syn_in)
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
-                    loss_syn_in = F.mse_loss(output_syn_in, syny_in)
+                    #loss_syn_in = F.mse_loss(output_syn_in, syny_in)
+                    loss_syn_in = torch.square(output_syn_in - syny_in) * _weight
+                    loss_syn_in = torch.mean(loss_syn_in)
                     loss_syn_in.backward()
                     optimizer_model.step()
 
