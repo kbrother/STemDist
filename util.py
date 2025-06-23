@@ -106,7 +106,7 @@ class DataLoaderCluster(DataLoader):
         xs = np.reshape(xs, (num_nodes, -1))   # num nodes x ... 
 
         kmeans = KMeans(n_clusters=num_clusters, mode='euclidean', init_method="kmeans++")
-        input_xs = torch.tensor(xs, device=device)
+        input_xs = torch.tensor(xs, device=device, dtype=torch.float)
         labels = kmeans.fit_predict(input_xs).cpu().numpy()        
         xs = kmeans.centroids.cpu().numpy()  # num nodes x ...
         xs = np.reshape(xs, (num_clusters, num_series, seq_len, num_feat))
