@@ -214,7 +214,7 @@ class GradMatchCluster:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 1 == 0:                
+            if (i+1) % 5 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     #device = torch.device(f"cpu")
-    dataloader =  util.load_dataset(args.data, args.batch_size, True, args.node_reduce_rate)
+    dataloader =  util.load_dataset(args.data, args.batch_size, True, args.node_reduce_rate, device)
     print("load finish")
 
     algo = GradMatchCluster(dataloader, args, device)    
