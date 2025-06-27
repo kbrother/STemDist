@@ -4,7 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import sys
 import util
-        
+from model.node_embed import *
+
 
 class nconv(nn.Module):
     def __init__(self):
@@ -55,7 +56,7 @@ class gcn(nn.Module):
         
 
 class gwnet(nn.Module):
-    def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12, residual_channels=32, dilation_channels=32, skip_channels=256, end_channels=512, blocks=4,layers=2, node_vec1=None, node_vec2=None):
+    def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12, residual_channels=32, dilation_channels=32, skip_channels=256, end_channels=512, blocks=4,layers=2, use_model=False, ne_dim=128):
         super(gwnet, self).__init__()
         self.dropout = dropout
         self.blocks = blocks
@@ -75,7 +76,10 @@ class gwnet(nn.Module):
         self.device = device
         self.num_nodes = num_nodes
 
-        if node_vec1 is None:
+        if use_model:
+            self.model1 = NodeEmbedding_attn(out_dim*in_dim, ne_dim, 10)
+            self.model2 = NodeEmbedding_attn(out_dim*in_dim, ne_dim, 10)
+        else:
             self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
             self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
             #self.nodevec2 = self.nodevec1.T
@@ -116,11 +120,17 @@ class gwnet(nn.Module):
         self.receptive_field = receptive_field
         
 
+    def embed_forward(self, _input):
+        node_embed1 = self.model1(_input)
+        node_embed2 = self.model2(_input)
+        self.set_node_embed(node_embed1, node_embed2)
+
+    
     def set_node_embed(self, node_embed1, node_embed2):
         self.register_buffer("nodevec1", node_embed1)
         self.register_buffer("nodevec2", node_embed2)
 
-
+    
     def forward(self, input):
         in_len = input.size(3)
         if in_len<self.receptive_field:
@@ -161,37 +171,25 @@ class gwnet(nn.Module):
         return x
 
 
-    def test_model(self, dataloader, scaler):
-        loss_sum, num_entry = 0, 0
-        for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            valx = torch.tensor(x, device=self.device, dtype=torch.float)
-            valx = valx.transpose(1, 3)
-            valy = torch.tensor(y, device=self.device, dtype=torch.float)
-            valy = valy[:,:,:,0]
-            output = self.forward(valx).squeeze()
-            output = scaler.inverse_transform(output)
-            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
-            loss_sum += curr_loss.item()
-            num_entry += num_curr_entry.item()               
-        return loss_sum/num_entry
+    def test_model(self, dataloader, scaler, device):
+        loss_sum, naive_loss_sum = 0, 0
 
-
-    def test_model2(self, embedding1, embedding2, dataloader, scaler):
-        loss_sum, num_entry = 0, 0
+        y_mean = 0
+        num_entry = 0
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
-            valx = torch.tensor(x, device=self.device, dtype=torch.float)
-            val_embed1 = embedding1(valx[...,0])
-            val_embed1 = torch.mean(val_embed1, dim=0)
-            val_embed2 = embedding2(valx[...,0])
-            val_embed2 = torch.mean(val_embed2, dim=0)
-            self.set_node_embed(val_embed1, val_embed2)   
-        
+            valy = torch.tensor(y, device=device, dtype=torch.float)
+            mask = (valy != 0.).float()            
+            num_entry += torch.sum(mask)
+            y_mean += torch.sum(valy)
+        y_mean /= num_entry
+            
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valx = torch.tensor(x, device=device, dtype=torch.float)
             valx = valx.transpose(1, 3)
-            valy = torch.tensor(y, device=self.device, dtype=torch.float)
-            valy = valy[:,:,:,0]
-            output = self.forward(valx).squeeze()
+            valy = torch.tensor(y, device=device, dtype=torch.float)
+            output = self.forward(valx).squeeze()            
             output = scaler.inverse_transform(output)
-            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
+            curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
             loss_sum += curr_loss.item()
-            num_entry += num_curr_entry.item()               
-        return loss_sum/num_entry
+            naive_loss_sum += curr_naive_loss.item()
+        return loss_sum/naive_loss_sum
