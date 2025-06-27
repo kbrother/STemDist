@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import util
+from model.node_embed import *
 
 
 class AVWGCN(nn.Module):
@@ -54,8 +55,8 @@ class AGCRNCell(nn.Module):
         h = r*state + (1-r)*hc
         return h
 
-    def init_hidden_state(self, batch_size):
-        return torch.zeros(batch_size, self.node_num, self.hidden_dim)
+    def init_hidden_state(self, batch_size, node_num):
+        return torch.zeros(batch_size, node_num, self.hidden_dim)
 
 
 class AVWDCRNN(nn.Module):
@@ -73,7 +74,7 @@ class AVWDCRNN(nn.Module):
     def forward(self, x, init_state, node_embeddings):
         #shape of x: (B, T, N, D)
         #shape of init_state: (num_layers, B, N, hidden_dim)
-        assert x.shape[2] == self.node_num and x.shape[3] == self.input_dim
+        #assert x.shape[2] == self.node_num and x.shape[3] == self.input_dim
         seq_length = x.shape[1]
         current_inputs = x
         output_hidden = []
@@ -90,15 +91,15 @@ class AVWDCRNN(nn.Module):
         #last_state: (B, N, hidden_dim)
         return current_inputs, output_hidden
 
-    def init_hidden(self, batch_size):
+    def init_hidden(self, batch_size, node_num):
         init_states = []
         for i in range(self.num_layers):
-            init_states.append(self.dcrnn_cells[i].init_hidden_state(batch_size))
+            init_states.append(self.dcrnn_cells[i].init_hidden_state(batch_size, node_num))
         return torch.stack(init_states, dim=0)      #(num_layers, B, N, hidden_dim)
 
 
 class AGCRN(nn.Module):
-    def __init__(self, args, num_nodes, input_dim, node_embed=None):
+    def __init__(self, args, num_nodes, input_dim, use_model=False, ne_dim=128):
         super(AGCRN, self).__init__()
         self.num_nodes = num_nodes
         self.input_dim = input_dim
@@ -107,44 +108,59 @@ class AGCRN(nn.Module):
         self.horizon = 12
         self.num_layers = args.num_layers
 
-        if node_embed is None:
-            self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, args.embed_dim), requires_grad=True)
+        if use_model:
+            self.model = NodeEmbedding_attn(self.horizon*input_dim, ne_dim, args.embed_dim)
         else:
-            #self.node_embeddings = nn.Parameter(node_embed)
-            self.node_embeddings = node_embed
-
+            self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, args.embed_dim), requires_grad=True)
         self.encoder = AVWDCRNN(self.num_nodes, input_dim, args.rnn_units, 2,
                                 args.embed_dim, args.num_layers)
 
         #predictor
         self.end_conv = nn.Conv2d(1, self.horizon * self.output_dim, kernel_size=(1, self.hidden_dim), bias=True)
 
+
+    def embed_forward(self, _input):
+        node_embed = self.model(_input)
+        self.register_buffer("node_embeddings", node_embed)
+            
+    
     def forward(self, source):
         #source: B, T_1, N, D
         #target: B, T_2, N, C
         #supports = F.softmax(F.relu(torch.mm(self.nodevec1, self.nodevec1.transpose(0,1))), dim=1)
         
-        init_state = self.encoder.init_hidden(source.shape[0])
+        init_state = self.encoder.init_hidden(source.shape[0], source.shape[2])
         output, _ = self.encoder(source, init_state, self.node_embeddings)      #B, T, N, hidden
         output = output[:, -1:, :, :]                                   #B, 1, N, hidden
             
         #CNN based predictor
-        output = self.end_conv((output))                         #B, T*C, N, 1
-        output = output.squeeze(-1).reshape(-1, self.horizon, self.output_dim, self.num_nodes)
+        output = self.end_conv((output))        #B, T*C, N, 1
+        num_node = source.shape[2]
+        output = output.squeeze(-1).reshape(-1, self.horizon, self.output_dim, num_node)
         output = output.permute(0, 1, 3, 2)                             #B, T, N, C
 
         return output
 
-    
+
     def test_model(self, dataloader, scaler, device):
-        loss_sum, num_entry = 0, 0
+        loss_sum, naive_loss_sum = 0, 0
+
+        y_mean = 0
+        num_entry = 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valy = torch.tensor(y, device=device, dtype=torch.float)
+            mask = (valy != 0.).float()            
+            num_entry += torch.sum(mask)
+            y_mean += torch.sum(valy)
+        y_mean /= num_entry
+            
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
             valy = torch.tensor(y, device=device, dtype=torch.float)
-            valy = valy[:,:,:,0]
-            output = self.forward(valx).squeeze()
+            output = self.forward(valx).squeeze()            
             output = scaler.inverse_transform(output)
-            curr_loss, num_curr_entry = util.masked_se(output, valy, 0.)
+            curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
             loss_sum += curr_loss.item()
-            num_entry += num_curr_entry.item()               
-        return loss_sum/num_entry
+            naive_loss_sum += curr_naive_loss.item()
+        return loss_sum/naive_loss_sum
+    
