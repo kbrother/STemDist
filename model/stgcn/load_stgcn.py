@@ -1,5 +1,5 @@
 from tqdm import tqdm
-from model.gwave.gwave import gwnet
+from model.stgcn.stgcn import STGCN
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -12,16 +12,14 @@ import copy
 import math
 
 
-def test_gwnet(args, data, synx, syny, device):
+def test_stgcn(args, data, synx, syny, device):
 
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
     scaler = data['scaler']
     seq_len = data['train_loader'].xs.shape[1]
-    _model =  gwnet(device, num_nodes, args.dropout, in_dim, seq_len, residual_channels=args.nhid, 
-                  use_model=True,
-                  dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
-
+    _model = STGCN(in_dim, seq_len, seq_len, 128)
+    
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
@@ -34,10 +32,13 @@ def test_gwnet(args, data, synx, syny, device):
     nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
     nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
     nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
-    for i in tqdm(range(300)):
+
+    synx = torch.transpose(synx, 1, 2)
+    syny = torch.transpose(syny, 1, 2)
+    for i in tqdm(range(args.epochs)):
         _model.train()
         _model.embed_forward(nm_input_syn)
-        output_syn = _model(synx.transpose(1,3)).squeeze()
+        output_syn = _model(synx)
         loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
         loss_syn.backward()
@@ -49,7 +50,7 @@ def test_gwnet(args, data, synx, syny, device):
                 _model.embed_forward(nm_input_real)
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
-            print(f"epoch :{i}, train loss: {loss_syn.item()} val loss: {val_loss}")
+            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
                 min_val_loss = val_loss
@@ -60,11 +61,11 @@ def test_gwnet(args, data, synx, syny, device):
     with torch.no_grad():
         _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+    print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")       
 
-    print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
-
-# python -m model.gwave.load_wavenet -de 0 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
+# python -m model.stgcn.load_stgcn -de 1 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
+# python -m model.stgcn.load_stgcn -de 0 -d ../data/GLA -lrs 2e-3 -lp results/dc_clus_gla.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -74,8 +75,7 @@ if __name__ == "__main__":
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-2,help='learning rate')    
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
-    parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
+    parser.add_argument('-e', '--epochs', default=100, type=int)
     args = parser.parse_args()
 
     # random seed setting
@@ -93,4 +93,4 @@ if __name__ == "__main__":
     print(synx.shape)
     print(syny.shape)
 
-    test_gwnet(args, dataloader, synx, syny, device)
+    test_stgcn(args, dataloader, synx, syny, device)
