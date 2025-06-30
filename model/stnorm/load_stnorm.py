@@ -32,7 +32,7 @@ def test_stnorm(args, data, synx, syny, device):
     nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
     nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
     nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
-    for i in tqdm(range(300)):
+    for i in tqdm(range(args.epochs)):
         _model.train()
         output_syn = _model(synx).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
@@ -60,12 +60,14 @@ def test_stnorm(args, data, synx, syny, device):
 
 
 # python -m model.stnorm.load_stnorm -de 1 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
+# python -m model.stnorm.load_stnorm -de 1 -d ../data/GLA -lrs 1e-3 -lp results/dc_clus_gla.pt -e 500
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**5, help='batch size')
+    parser.add_argument('-e', '--epochs', type=int, default=500, help='batch size')
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-2,help='learning rate')    
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 

@@ -13,7 +13,7 @@ import sys
 import numpy as np
 
 
-# python -m model.stnorm.train_stnorm -de 0 -d ../data/GBA -lr 1e-3 -e 100
+# python -m model.stnorm.train_stnorm -de 0 -d ../data/GLA -lr 1e-3 -e 100
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
