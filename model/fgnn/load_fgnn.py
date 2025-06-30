@@ -12,7 +12,7 @@ import copy
 import math
 
 
-def test_agcrn(args, data, synx, syny, device):
+def test_fgnn(args, data, synx, syny, device):
     
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
@@ -53,7 +53,7 @@ def test_agcrn(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.fgnn.load_fgnn -de 0 -d ../data/GBA -lr 1e-3 -e 300 -lp results/dc_clus_gba.pt
+# python -m model.fgnn.load_fgnn -de 1 -d ../data/GBA -lr 1e-3 -e 300 -lp results/dc_clus_gba.pt
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('-de', '--device', type=int, default=0, help='')
@@ -82,4 +82,4 @@ if __name__ == "__main__":
     print(synx.shape)
     print(syny.shape)
 
-    test_agcrn(args, dataloader, synx, syny, device)
+    test_fgnn(args, dataloader, synx, syny, device)
