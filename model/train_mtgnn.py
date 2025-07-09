@@ -10,15 +10,13 @@ from model.node_embed import NodeEmbedding_rnn, NodeEmbedding_birnn, NodeEmbeddi
 import torch.optim as optim
 import math
 import sys
+import copy
 
-
-# python -m model.train_mtgnn2 -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0 -sp results/METR-LA-1e-2.txt
-# python -m model.train_mtgnn2 -de 3 -d ../data/ELECTRICITY -lr 1e-3 -e 100 -s 0 -sl 24 -sp results/ELEC-1e-3.txt 
-# python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64 -sp results/STOCK-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/AIR-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/PEMS-BAY-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/SOLAR -lr 1e-2 -e 100 -s 0 -sl 6 -sp results/SOLAR-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/TRAFFIC -lr 1e-2 -e 100 -s 0 -sl 24 -sp results/TRAFFIC-1e-2.txt
+# python -m model.train_mtgnn -de 7 -d ../data/GBA -sp results/mtgnn_gba.pt -b 32 -lr 1e-3 
+# python -m model.train_mtgnn -de 5 -d ../data/ERA5 -sp results/mtgnn_era5.pt -b 32 -lr 1e-2
+# python -m model.train_mtgnn -de 6 -d ../data/GLA -sp results/mtgnn_gla.pt -b 128 -lr 1e-2
+# python -m model.train_mtgnn -de 5 -d ../data/AURORA -sp results/mtgnn_aurora.pt -b 32 -lr 1e-3
+# python -m model.train_mtgnn -de 3 -d ../data/CA -sp results/mtgnn_ca.pt -b 32 -lr 1e-3
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -27,7 +25,6 @@ if __name__ == "__main__":
     parser.add_argument('-sp', '--save_path', type=str, default='results/METR-LA-1e-2', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-bne', '--batch_size_ne', type=int, default=10, help='batch size')
-    parser.add_argument('-sl', '--seq_len', type=int, default=12, help='sequence length')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-us', '--use_static_feat', action='store_true', help='true if using node embedding model')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
@@ -48,6 +45,7 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
+    seq_len = dataloader['train_loader'].xs.shape[1]
     if len(dataloader['train_loader'].ys.shape) == 4:        
         out_dim = dataloader['train_loader'].ys.shape[3]
     else: 
@@ -57,7 +55,7 @@ if __name__ == "__main__":
                   device, predefined_A=None, use_static_feat=args.use_static_feat,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
-                  seq_length=args.seq_len, in_dim=in_dim, out_dim=out_dim,
+                  seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
     model.to(device)
     #model.reset_parameters()
@@ -69,6 +67,7 @@ if __name__ == "__main__":
     xx = np.transpose(xx, (1, 0, 2))   # num_nodes x 12
     xx = torch.tensor(xx, dtype=torch.float, device=device)    
     xx = torch.reshape(xx, (num_nodes, -1))
+    min_val_mse = sys.float_info.max
     for i in range(args.epochs):
         model.train()        
         dataloader['train_loader'].shuffle()           
@@ -94,5 +93,10 @@ if __name__ == "__main__":
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
             print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}\n')
+            #with open(args.save_path, "a") as f:
+            #    f.write(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}\n')
+
+            if min_val_mse > val_mse:
+                min_val_mse = val_mse
+                min_params = copy.deepcopy(model.state_dict())
+                torch.save(min_params, args.save_path)
