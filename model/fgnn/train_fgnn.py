@@ -13,7 +13,9 @@ import sys
 import numpy as np
 
 
-# python -m model.fgnn.train_fgnn -de 0 -d ../data/GBA -lr 1e-3 -e 100
+# python -m model.fgnn.train_fgnn -de 6 -d ../data/GBA -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_gba.txt
+# python -m model.fgnn.train_fgnn -de 7 -d ../data/GLA -lr 1e-3 -e 100 -b 32 -sp results/real_fgnn_gla.txt
+# python -m model.fgnn.train_fgnn -de 7 -d ../data/ERA5 -lr 1e-2 -e 100 -b 32 -sp results/real_fgnn_era5.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -25,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--epochs', default=100, type=int)
     parser.add_argument('--embed_size', type=int, default=128, help='hidden dimensions')
     parser.add_argument('--hidden_size', type=int, default=256, help='hidden dimensions')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/', help='data path')
     args = parser.parse_args()
     
  # random seed setting
@@ -69,3 +72,6 @@ if __name__ == "__main__":
             val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
             test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device)         )   
             print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+
+            with open(args.save_path, "a") as f:
+                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')

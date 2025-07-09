@@ -5,7 +5,7 @@ import time
 import util
 from tqdm import tqdm
 import random
-from model.gwave import gwnet
+from model.gwave.gwave import gwnet
 import torch.optim as optim
 import math
 from scipy.io import loadmat
@@ -13,8 +13,9 @@ import sys
 import numpy as np
 
 
-# python -m model.train_wavenet -de 0 -d ../data/METR-LA -lr 1e-2 -e 100
-# python -m model.train_wavenet -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100
+# python -m model.gwave.train_wavenet -de 7 -d ../data/GBA -lr 1e-2 -e 100 -sp results/real_gwave_gba.txt -b 32
+# python -m model.gwave.train_wavenet -de 5 -d ../data/GLA -lr 1e-3 -e 100 -sp results/real_gwave_gla.txt -b 32
+# python -m model.gwave.train_wavenet -de 5 -d ../data/ERA5 -lr 1e-3 -e 100 -sp results/real_gwave_era5.txt -b 32
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/', help='data path')
     args = parser.parse_args()
     
     # random seed setting
@@ -57,7 +59,6 @@ if __name__ == "__main__":
             trainx = torch.tensor(x, device=device, dtype=torch.float)
             trainx = trainx.transpose(1, 3)
             trainy = torch.tensor(y, device=device, dtype=torch.float)
-            trainy = trainy[:,:,:,0]
             output = model(trainx).squeeze()
             output = scaler.inverse_transform(output)
             curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)
@@ -69,12 +70,9 @@ if __name__ == "__main__":
 
         model.eval()
         with torch.no_grad():               
-            val_mae = model.test_model(dataloader['val_loader'], scaler)
-            test_mae = model.test_model(dataloader['test_loader'], scaler)            
+            val_mae = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
+            test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
             print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
 
-            if min_val_mse > val_mae:
-                min_val_mse = val_mae
-                vec1 = model.nodevec1.data.cpu().numpy()
-                vec2 = model.nodevec2.data.cpu().numpy()
-                np.save('model/node_embed_pems.npy', {'v1': vec1, 'v2': vec2})
+            with open(args.save_path, "a") as f:
+                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')

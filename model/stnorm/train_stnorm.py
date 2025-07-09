@@ -13,7 +13,9 @@ import sys
 import numpy as np
 
 
-# python -m model.stnorm.train_stnorm -de 0 -d ../data/GLA -lr 1e-3 -e 100
+# python -m model.stnorm.train_stnorm -de 5 -d ../data/GBA -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_gba.txt
+# python -m model.stnorm.train_stnorm -de 5 -d ../data/GLA -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_gla.txt
+# python -m model.stnorm.train_stnorm -de 6 -d ../data/ERA5 -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_era5.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -25,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/', help='data path')
     args = parser.parse_args()
     
     # random seed setting
@@ -67,3 +70,5 @@ if __name__ == "__main__":
             val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
             test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device)            )
             print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+            with open(args.save_path, "a") as f:
+                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')

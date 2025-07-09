@@ -19,24 +19,14 @@ def test_gwnet(args, data, synx, syny, device):
     scaler = data['scaler']
     seq_len = data['train_loader'].xs.shape[1]
     _model =  gwnet(device, num_nodes, args.dropout, in_dim, seq_len, residual_channels=args.nhid, 
-                  use_model=True,
+                  use_model=False,
                   dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
 
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-
-    nm_input_real = np.mean(data['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
-    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
-    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
-     
-    nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
-    nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
-    nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
     for i in tqdm(range(300)):
         _model.train()
-        _model.embed_forward(nm_input_syn)
         output_syn = _model(synx.transpose(1,3)).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
@@ -46,7 +36,6 @@ def test_gwnet(args, data, synx, syny, device):
         _model.eval()
         if (i+1)%10 == 0:
             with torch.no_grad():
-                _model.embed_forward(nm_input_real)
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
             print(f"epoch :{i}, train loss: {loss_syn.item()} val loss: {val_loss}")
@@ -58,15 +47,14 @@ def test_gwnet(args, data, synx, syny, device):
     _model.load_state_dict(min_params)
     _model.eval()
     with torch.no_grad():
-        _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.gwave.load_wavenet -de 0 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
-# python -m model.gwave.load_wavenet -de 7 -d ../data/GLA -lrs 1e-3 -lp results/dc_clus_gla.pt
-# python -m model.gwave.load_wavenet -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/dc_clus_era5.pt
+# python -m model.gwave.load_wavenet_coreset -de 0 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt
+# python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/GLA -lrs 1e-2 -lp results/random_gla.pt
+# python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/random_era5.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

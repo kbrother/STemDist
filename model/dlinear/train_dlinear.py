@@ -5,19 +5,13 @@ import time
 import util
 from tqdm import tqdm
 import random
-from model.dlinear import Model
+from model.dlinear.dlinear import Model
 import torch.optim as optim
 import math
 import sys
 
 
-# python -m model.train_dlinear -de 0 -d ../data/METR-LA -lr 1e-2 -e 100 -s 0 -sp results/METR-LA-1e-2.txt
-# python -m model.train_mtgnn2 -de 3 -d ../data/ELECTRICITY -lr 1e-3 -e 100 -s 0 -sl 24 -sp results/ELEC-1e-3.txt 
-# python -m model.train_mtgnn2 -de 0 -d ../data/STOCK -lr 1e-2 -e 100 -s 0 -sl 7 -b 64 -sp results/STOCK-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/AIR_DATA -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/AIR-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/PEMS-BAY -lr 1e-2 -e 100 -s 0 -sl 12 -sp results/PEMS-BAY-1e-2.txt
-# python -m model.train_mtgnn2 -de 0 -d ../data/SOLAR -lr 1e-2 -e 100 -s 0 -sl 6 -sp results/SOLAR-1e-2.txt
-# python -m model.dlinear -de 0 -d ../data/TRAFFIC -lr 1e-2 -e 100 -s 0 -sl 24 -sp results/TRAFFIC-1e-2.txt
+# python -m model.dlinear.train_dlinear -de 0 -d ../data/GLA -lr 1e-2 -e 100 -s 0 -sp results/dlinear-era5.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

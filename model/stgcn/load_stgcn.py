@@ -64,8 +64,9 @@ def test_stgcn(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")       
 
 
-# python -m model.stgcn.load_stgcn -de 1 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
-# python -m model.stgcn.load_stgcn -de 0 -d ../data/GLA -lrs 2e-3 -lp results/dc_clus_gla.pt
+# python -m model.stgcn.load_stgcn -de 7 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt -e 300
+# python -m model.stgcn.load_stgcn -de 7 -d ../data/GLA -lrs 1e-3 -lp results/dc_clus_gla.pt -e 300
+# python -m model.stgcn.load_stgcn -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/dc_clus_era5.pt -e 300
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

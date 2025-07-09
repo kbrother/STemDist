@@ -81,7 +81,7 @@ class gwnet(nn.Module):
             self.model2 = NodeEmbedding_attn(out_dim*in_dim, ne_dim, 10)
         else:
             self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)
-            self.nodevec2 = nn.Parameter(torch.randn(10, num_nodes).to(device), requires_grad=True).to(device)        
+            self.nodevec2 = nn.Parameter(torch.randn(num_nodes, 10).to(device), requires_grad=True).to(device)        
             #self.nodevec2 = self.nodevec1.T
         
         for b in range(blocks):

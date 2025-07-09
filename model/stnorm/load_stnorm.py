@@ -23,15 +23,6 @@ def test_stnorm(args, data, synx, syny, device):
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-
-    nm_input_real = np.mean(data['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
-    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
-    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
-     
-    nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
-    nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
-    nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
     for i in tqdm(range(args.epochs)):
         _model.train()
         output_syn = _model(synx).squeeze()
@@ -59,8 +50,10 @@ def test_stnorm(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.stnorm.load_stnorm -de 1 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt
-# python -m model.stnorm.load_stnorm -de 1 -d ../data/GLA -lrs 1e-3 -lp results/dc_clus_gla.pt -e 500
+# python -m model.stnorm.load_stnorm -de 5 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt -b 32
+# python -m model.stnorm.load_stnorm -de 5 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt -b 32
+# python -m model.stnorm.load_stnorm -de 7 -d ../data/GLA -lrs 1e-3 -lp results/dc_clus_gla.pt -e 300 -b 32
+# python -m model.stnorm.load_stnorm -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/dc_clus_era5.pt -e 300 -b 32
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

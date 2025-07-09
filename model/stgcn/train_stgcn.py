@@ -13,13 +13,15 @@ import sys
 import numpy as np
 
 
-# python -m model.stgcn.train_stgcn -de 0 -d ../data/GBA -lr 2e-3 -e 200
-# python -m model.stgcn.train_stgcn -de 0 -d ../data/GLA -lrs 2e-3 -lp results/dc_clus_gla.pt
+# python -m model.stgcn.train_stgcn -de 6 -d ../data/GBA -lr 1e-2 -e 100 -sp results/real_stgcn_gba.txt
+# python -m model.stgcn.train_stgcn -de 6 -d ../data/GLA -lr 1e-2 -e 100 -sp results/real_stgcn_gla.txt
+# python -m model.stgcn.train_stgcn -de 6 -d ../data/ERA5 -lr 1e-2 -e 100 -sp results/real_stgcn_era5.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**5, help='batch size')
     parser.add_argument('-lr', '--lr',type=float,default=1e-2,help='learning rate')    
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
@@ -71,5 +73,8 @@ if __name__ == "__main__":
         _model.eval()
         with torch.no_grad():               
             val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device)         )   
+            test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))            
             print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+
+            with open(args.save_path, "a") as f:
+                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')

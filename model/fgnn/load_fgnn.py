@@ -39,7 +39,7 @@ def test_fgnn(args, data, synx, syny, device):
             with torch.no_grad():
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
-            print(f"epoch :{i}, val loss: {val_loss}")
+            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
                 min_val_loss = val_loss
@@ -53,7 +53,9 @@ def test_fgnn(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.fgnn.load_fgnn -de 1 -d ../data/GBA -lr 1e-3 -e 300 -lp results/dc_clus_gba.pt
+# python -m model.fgnn.load_fgnn -de 5 -d ../data/GBA -lr 1e-2 -e 300 -lp results/random_gba.pt -b 32
+# python -m model.fgnn.load_fgnn -de 7 -d ../data/GLA -lr 1e-2 -e 500 -lp results/random_gla.pt -b 32
+# python -m model.fgnn.load_fgnn -de 7 -d ../data/ERA5 -lr 1e-2 -e 500 -lp results/random_era5.pt -b 32
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description='arguments')
     args.add_argument('-de', '--device', type=int, default=0, help='')
