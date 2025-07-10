@@ -42,7 +42,11 @@ class Frepo(DataDistill):
             _model.to(self.device)
             optimizer_model = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
             train_loss, num_loop = 0, 0
-            for it, (x, y) in enumerate((data['train_loader'].get_iterator())): 
+
+            data['train_loader'].shuffle()
+            data['train_loader'].current_ind = 0  
+            for il in range(args.k):
+                x, y = data['train_loader'].get_next()                      
                 _model.eval()
                 realx = torch.tensor(x, device=device, dtype=torch.float)                
                 realx = realx.transpose(1, 3)
@@ -88,7 +92,9 @@ class Frepo(DataDistill):
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
 
 
-# python -m Frepo.distill_mtgnn_orig -de 4 -d ../data/GBA -e 300 -sp results/frepo_gba -lrf 1e-2 -lrs 1e-3 -rr 1e-2 -b 128 -c 1
+# python -m Frepo.distill_mtgnn_orig -de 6 -d ../data/GBA -e 300 -sp results/frepo_gba -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1 -k 5
+# python -m Frepo.distill_mtgnn_orig -de 5 -d ../data/GLA -e 300 -sp results/frepo_gla -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1
+# python -m Frepo.distill_mtgnn_orig -de 4 -d ../data/ERA5 -e 300 -sp results/frepo_era5 -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 5 -k 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -102,6 +108,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check',type=int,default=5,help='')
+    parser.add_argument('-k', '--k',type=int,default=5,help='')
     
     args = parser.parse_args()
     
