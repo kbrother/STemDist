@@ -12,6 +12,50 @@ import torch.nn.functional as F
 import torch.optim as optim
 import copy
 import math
+from scipy import signal
+from scipy.stats import linregress
+from statsmodels.tsa.seasonal import seasonal_decompose
+import numpy as np
+import pandas as pd
+
+def moving_average(ts: torch.Tensor, kernel_size: int) -> torch.Tensor:
+    B, T, N = ts.shape
+    ts_reshaped = ts.permute(0, 2, 1)  # [B, N, T]
+    padding = kernel_size // 2
+
+    trend = F.avg_pool1d(ts_reshaped, kernel_size=kernel_size, stride=1, padding=padding)  # [B, N, T]
+    trend = trend.permute(0, 2, 1)  # [B, T, N]
+    # trend shape을 ts shape과 동일하게 맞춰주기
+    trend = trend[:, :-1, :]  # [B, T-1, N]으로 shape 조정
+    return trend
+
+
+def decompose_series_ma(ts: torch.Tensor, period=12):
+    # [B, T, N]
+    trend = moving_average(ts, kernel_size=period)
+    # print(trend.shape) # [128, 49, 235]
+    # print(ts.shape) # [128, 48, 235]
+    seasonality = ts - trend
+    return trend, seasonality
+
+
+def calculate_decomposed_loss(pred, target, weight=None, period=12, model='additive', null_val=0.0):
+    # print(pred.shape) # [128, 48, 235]
+    # print(target.shape) # [128, 48, 235]
+    pred_trend, pred_seasonality = decompose_series_ma(pred, period)
+    target_trend, target_seasonality = decompose_series_ma(target, period)
+    
+    mask = (target != null_val)
+    mask = mask.float()
+
+    trend_diff = torch.square(pred_trend - target_trend) * weight
+    trend_loss = torch.sum(trend_diff * mask) / torch.sum(mask)
+    
+    seasonality_diff = torch.square(pred_seasonality - target_seasonality) * weight
+    seasonality_loss = torch.sum(seasonality_diff * mask) / torch.sum(mask)
+    
+    total_loss = 0.5 * trend_loss + 0.5 * seasonality_loss    
+    return total_loss, trend_loss, seasonality_loss
 
 
 class GradMatchCluster:
@@ -45,10 +89,10 @@ class GradMatchCluster:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
 
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-        with open(args.save_path + ".txt", 'a') as f:
-            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
+        # min_i, val_loss, test_loss = self.test_syn()
+        # print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        # with open(args.save_path + ".txt", 'a') as f:
+        #     f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
 
         
     def test_syn(self):
@@ -86,15 +130,17 @@ class GradMatchCluster:
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
 
         _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
+        # print(dataloader['train_loader'].label_cnt)
         _weight = _weight / torch.sum(_weight)
         _weight = _weight.unsqueeze(0).unsqueeze(0)
         for i in tqdm(range(200)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
-            output_syn = _model(synx.transpose(1,3)).squeeze()
-            #loss_syn = F.mse_loss(output_syn, syny)
-            loss_syn = torch.square(output_syn - syny) * _weight
-            loss_syn = torch.mean(loss_syn)
+            output_syn = _model(synx.transpose(1,3)).squeeze()            
+            
+            # 분해된 loss 계산
+            total_loss_syn, _, _ = calculate_decomposed_loss(output_syn, syny, _weight, period=12, model='additive', null_val=0.0)
+            loss_syn = total_loss_syn            
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
@@ -123,6 +169,7 @@ class GradMatchCluster:
         args = self.args
         data = self.data
         synx, syny = self.synx, self.syny
+
 
         in_dim = data['train_loader'].xs.shape[3]
         seq_len = data['train_loader'].xs.shape[1]
@@ -168,13 +215,19 @@ class GradMatchCluster:
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                output_real_temp = _model(realx.transpose(1, 3)).squeeze()                
-                output_real = scaler.inverse_transform(output_real_temp)
+                output_real_temp = _model(realx.transpose(1, 3)).squeeze()   
+                # output_real = scaler.inverse_transform(output_real_temp)
 
-                loss_real = torch.square(output_real - realy) * _weight
-                loss_real = torch.mean(loss_real)                
-                gw_real = torch.autograd.grad(loss_real, model_params, retain_graph=True)
-                gw_real = [_.detach().clone() for _ in gw_real]
+                # 분해된 loss 계산 (scaler.inverse_transform 전에 수행)
+                total_loss_real, trend_loss_real, seasonality_loss_real = calculate_decomposed_loss(output_real_temp, realy, _weight, period=12, model='additive', null_val=0.0)
+                
+                # 각 성분별 gradient 계산
+                gw_real_trend = torch.autograd.grad(trend_loss_real, model_params, retain_graph=True)
+                gw_real_seasonality = torch.autograd.grad(seasonality_loss_real, model_params, retain_graph=True)
+                
+                # 각 성분별 gradient를 detach하고 clone
+                gw_real_trend = [_.detach().clone() for _ in gw_real_trend]
+                gw_real_seasonality = [_.detach().clone() for _ in gw_real_seasonality]
 
                 nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
                 nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
@@ -182,13 +235,20 @@ class GradMatchCluster:
                 
                 _model.embed_forward(nm_input_syn)
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
-                #loss_syn = F.mse_loss(output_syn, syny)
-                loss_syn = torch.square(output_syn - syny) * _weight
-                loss_syn = torch.mean(loss_syn)
-                gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
                 
-                #pbar.close()
-                _loss = util.match_loss(gw_syn, gw_real, self.device)                
+                # 분해된 loss 계산
+                total_loss_syn, trend_loss_syn, seasonality_loss_syn = calculate_decomposed_loss(output_syn, syny, _weight, period=12, model='additive', null_val=0.0)
+                
+                # 각 성분별 gradient 계산
+                gw_syn_trend = torch.autograd.grad(trend_loss_syn, model_params, create_graph=True)
+                gw_syn_seasonality = torch.autograd.grad(seasonality_loss_syn, model_params, create_graph=True)
+                
+                # 각 성분별 gradient matching loss 계산
+                _loss_trend = util.match_loss(gw_syn_trend, gw_real_trend, self.device)
+                _loss_seasonality = util.match_loss(gw_syn_seasonality, gw_real_seasonality, self.device)
+                
+                # 전체 loss는 각 성분별 loss의 가중 평균
+                _loss = 0.5 * _loss_trend + 0.5 * _loss_seasonality                
                 # gradient descent                
                 grad_loss += _loss.item()
                 optimizer.zero_grad()
@@ -207,9 +267,11 @@ class GradMatchCluster:
                     optimizer_model.zero_grad()
                     _model.embed_forward(nm_input_syn_in)
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
-                    #loss_syn_in = F.mse_loss(output_syn_in, syny_in)
-                    loss_syn_in = torch.square(output_syn_in - syny_in) * _weight
-                    loss_syn_in = torch.mean(loss_syn_in)
+                    
+                    # 분해된 loss 계산
+                    total_loss_syn_in, _, _ = calculate_decomposed_loss(output_syn_in, syny_in, _weight, period=12, model='additive', null_val=0.0)
+                    loss_syn_in = total_loss_syn_in
+                    
                     loss_syn_in.backward()
                     optimizer_model.step()
 
@@ -217,8 +279,10 @@ class GradMatchCluster:
             if (i+1) % 5 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+                                
                 with open(args.save_path + ".txt", 'a') as f:
                     f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
+                    
                 if min_val_loss > val_loss:
                     min_val_loss = val_loss
                     synx_ = synx.detach().clone().cpu()
@@ -226,6 +290,7 @@ class GradMatchCluster:
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
                   
 
+# python -m DC.distill_mtgnn_cluster -de 1 -d ../data/GBA_48 -e 300 -sp results/dc_gba_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 5
 
 # python -m DC.distill_mtgnn -de 0 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 1e-2 -nrr 0.2 -b 256 -ned 32
 # python -m DC.distill_mtgnn -de 2 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 256
@@ -245,7 +310,7 @@ if __name__ == "__main__":
     parser.add_argument('-srr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
-    parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-s', '--seed', type=int, default=5, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     
     args = parser.parse_args()
