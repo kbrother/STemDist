@@ -136,17 +136,15 @@ class GradMatchCluster:
             _model.train()
             _model.embed_forward(nm_input_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()            
-            
-            # 분해된 loss 계산
-            # total_loss_syn, _, _ = calculate_decomposed_loss(output_syn, syny, _weight, period=12, model='additive', null_val=0.0)
-            # loss_syn = total_loss_syn            
-            loss_syn = F.mse_loss(output_syn, syny)
+              
+            loss_syn = torch.square(output_syn - syny) * _weight
+            loss_syn = torch.mean(loss_syn)
             optimizer.zero_grad()
             loss_syn.backward()
             optimizer.step()
 
             _model.eval()
-            if (i+1)%args.check_freq == 0:
+            if (i+1)%10 == 0:
                 with torch.no_grad():
                     _model.embed_forward(nm_input_real)
                     val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
@@ -216,10 +214,10 @@ class GradMatchCluster:
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
                 output_real_temp = _model(realx.transpose(1, 3)).squeeze()   
-                # output_real = scaler.inverse_transform(output_real_temp)
+                output_real = scaler.inverse_transform(output_real_temp)
 
                 # 분해된 loss 계산 (scaler.inverse_transform 전에 수행)
-                total_loss_real, trend_loss_real, seasonality_loss_real = calculate_decomposed_loss(output_real_temp, realy, _weight, period=6, model='additive', null_val=0.0)
+                total_loss_real, trend_loss_real, seasonality_loss_real = calculate_decomposed_loss(output_real, realy, _weight, period=6, model='additive', null_val=0.0)
                 
                 # 각 성분별 gradient 계산
                 gw_real_trend = torch.autograd.grad(trend_loss_real, model_params, retain_graph=True)
@@ -268,11 +266,7 @@ class GradMatchCluster:
                     _model.embed_forward(nm_input_syn_in)
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
                     
-                    # 분해된 loss 계산
-                    # total_loss_syn_in, _, _ = calculate_decomposed_loss(output_syn_in, syny_in, _weight, period=12, model='additive', null_val=0.0)
-                    # loss_syn_in = total_loss_syn_in
-                    loss_syn_in = F.mse_loss(output_syn_in, syny_in)
-                    
+                    loss_syn_in = F.mse_loss(output_syn_in, syny_in)                    
                     loss_syn_in.backward()
                     optimizer_model.step()
 
@@ -292,6 +286,8 @@ class GradMatchCluster:
                   
 
 # python -m DC.distill_mtgnn_cluster -de 0 -d ../data/GBA_24 -e 300 -sp results/dc_gba_cluster -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 5
+# python -m DC.distill_mtgnn_cluster -de 0 -d ../data/ERA5_24 -e 300 -sp results/dc_era5_cluster -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 5
+
 
 # python -m DC.distill_mtgnn -de 0 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 1e-2 -nrr 0.2 -b 256 -ned 32
 # python -m DC.distill_mtgnn -de 2 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 256
