@@ -4,8 +4,8 @@ import random
 import torch
 
 
-# python -m coreset.random_sample -d ../data/GBA -rr 0.01 -sp results/random_gba.pt
-# python -m coreset.random_sample -d ../data/GLA -rr 0.01 -sp results/random_gla.pt
+# python -m coreset.random_sample -d ../data/GBA_24 -rr 0.01 -sp results/random_gba.pt
+# python -m coreset.random_sample -d ../data/GLA_24 -rr 0.01 -sp results/random_gla.pt
 # python -m coreset.random_sample -d ../data/ERA5 -rr 0.01 -sp results/random_era5.pt
 if __name__ == '__main__':
     args = argparse.ArgumentParser()

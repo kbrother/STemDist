@@ -57,7 +57,8 @@ def test_syn(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
 
 
-# python -m model.load_mtgnn_baseline -de 4 -d ../data/GBA_24 -lr 0.01 -e 300 -b 128 -lp results/random_gba.pt
+# python -m model.load_mtgnn_baseline -de 4 -d ../data/GBA_24 -lr 0.01 -e 200 -b 128 -lp results/random_gba.pt
+# python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA_24 -lr 0.001 -e 200 -b 128 -lp results/random_gla.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
