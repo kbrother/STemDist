@@ -47,11 +47,12 @@ class GradMatch:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
 
+        '''
         min_i, val_loss, test_loss = self.test_syn()
         print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
         with open(args.save_path + ".txt", 'a') as f:
             f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-
+        '''
         
     def test_syn(self):
         args = self.args
@@ -86,7 +87,7 @@ class GradMatch:
         nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
         nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
-        for i in tqdm(range(200)):  
+        for i in tqdm(range(100)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()
@@ -202,25 +203,35 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 5 == 0:                
-                min_i, val_loss, test_loss = self.test_syn()
-                print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            if (i+1) % args.check == 0:       
+                val_sum, test_sum = 0, 0
+                for j in range(3):
+                    set_seed(j)
+                    min_i, val_loss, test_loss = self.test_syn()
+                    val_sum += val_loss
+                    test_sum += test_loss
+                    print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+                    val_avg = val_sum/3
                 with open(args.save_path + ".txt", 'a') as f:
-                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-                if min_val_loss > val_loss:
-                    min_val_loss = val_loss
+                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_avg}, test loss: {test_sum/3}\n")
+                if min_val_loss > val_avg:
+                    min_val_loss = val_avg
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()                    
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
                   
 
+def set_seed(seed):
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
-# python -m DC.distill_mtgnn -de 0 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 1e-2 -nrr 0.2 -b 256 -ned 32
-# python -m DC.distill_mtgnn -de 2 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 256
-# python -m DC.distill_mtgnn -de 2 -d ../data/AIR_DATA -e 300 -sp results/dc_air_data_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
-# python -m DC.distill_mtgnn -de 6 -d ../data/ELECTRICITY -e 300 -sp results/dc_elec_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 16
-# python -m DC.distill_mtgnn -de 7 -d ../data/SOLAR -e 300 -sp results/dc_solar_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 128
-# python -m DC.distill_mtgnn -de 0 -d ../data/TRAFFIC -e 300 -sp results/dc_traffic_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 64 -ned 64
+    
+# python -m DC.distill_mtgnn -de 1 -d ../data/GBA -e 100 -sp results/dc_gba_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 1 -d ../data/GLA -e 100 -sp results/dc_gla_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 3 -d ../data/ERA5 -e 100 -sp results/dc_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 32 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 2 -d ../data/AURORA -e 100 -sp results/dc_aurora_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 32 -ned 32 -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -235,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
+    parser.add_argument('-c', '--check', type=int, default=10, help='')
     
     args = parser.parse_args()
     

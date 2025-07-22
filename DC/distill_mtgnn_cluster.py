@@ -12,49 +12,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import copy
 import math
-from scipy import signal
-from scipy.stats import linregress
-from statsmodels.tsa.seasonal import seasonal_decompose
-import numpy as np
-import pandas as pd
-
-def moving_average(ts: torch.Tensor, kernel_size: int) -> torch.Tensor:
-    B, T, N = ts.shape
-    ts_reshaped = ts.permute(0, 2, 1)  # [B, N, T]
-    padding = kernel_size // 2
-
-    trend = F.avg_pool1d(ts_reshaped, kernel_size=kernel_size, stride=1, padding=padding)  # [B, N, T]
-    trend = trend.permute(0, 2, 1)  # [B, T, N]
-    # trend shape을 ts shape과 동일하게 맞춰주기
-    trend = trend[:, :-1, :]  # [B, T-1, N]으로 shape 조정
-    return trend
-
-
-def decompose_series_ma(ts: torch.Tensor, period=6):
-    # [B, T, N]
-    trend = moving_average(ts, kernel_size=period)
-    # print(trend.shape) # [128, 49, 235]
-    # print(ts.shape) # [128, 48, 235]
-    seasonality = ts - trend
-    return trend, seasonality
-
-
-def calculate_decomposed_loss(pred, target, weight=None, period=6, model='additive', null_val=0.0):
-    # print(pred.shape) # [128, 48, 235]
-    # print(target.shape) # [128, 48, 235]
-    pred_trend, pred_seasonality = decompose_series_ma(pred, period)
-    target_trend, target_seasonality = decompose_series_ma(target, period)
-    
-    # mask = (target != null_val)
-    # mask = mask.float()
-
-    trend_loss = torch.mean(torch.square(pred_trend - target_trend) * weight)
-    # trend_loss = torch.sum(trend_diff * mask) / torch.sum(mask)
-    seasonality_loss = torch.mean(torch.square(pred_seasonality - target_seasonality) * weight)
-    # seasonality_loss = torch.sum(seasonality_diff * mask) / torch.sum(mask)
-    
-    total_loss = 0.5 * trend_loss + 0.5 * seasonality_loss    
-    return total_loss, trend_loss, seasonality_loss
 
 
 class GradMatchCluster:
@@ -129,14 +86,13 @@ class GradMatchCluster:
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
 
         _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
-        # print(dataloader['train_loader'].label_cnt)
         _weight = _weight / torch.sum(_weight)
         _weight = _weight.unsqueeze(0).unsqueeze(0)
         for i in tqdm(range(200)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
-            output_syn = _model(synx.transpose(1,3)).squeeze()            
-              
+            output_syn = _model(synx.transpose(1,3)).squeeze()
+            #loss_syn = F.mse_loss(output_syn, syny)
             loss_syn = torch.square(output_syn - syny) * _weight
             loss_syn = torch.mean(loss_syn)
             optimizer.zero_grad()
@@ -167,7 +123,6 @@ class GradMatchCluster:
         args = self.args
         data = self.data
         synx, syny = self.synx, self.syny
-
 
         in_dim = data['train_loader'].xs.shape[3]
         seq_len = data['train_loader'].xs.shape[1]
@@ -213,19 +168,13 @@ class GradMatchCluster:
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)
-                output_real_temp = _model(realx.transpose(1, 3)).squeeze()   
+                output_real_temp = _model(realx.transpose(1, 3)).squeeze()                
                 output_real = scaler.inverse_transform(output_real_temp)
 
-                # 분해된 loss 계산 (scaler.inverse_transform 전에 수행)
-                total_loss_real, trend_loss_real, seasonality_loss_real = calculate_decomposed_loss(output_real, realy, _weight, period=6, model='additive', null_val=0.0)
-                
-                # 각 성분별 gradient 계산
-                gw_real_trend = torch.autograd.grad(trend_loss_real, model_params, retain_graph=True)
-                gw_real_seasonality = torch.autograd.grad(seasonality_loss_real, model_params, retain_graph=True)
-                
-                # 각 성분별 gradient를 detach하고 clone
-                gw_real_trend = [_.detach().clone() for _ in gw_real_trend]
-                gw_real_seasonality = [_.detach().clone() for _ in gw_real_seasonality]
+                loss_real = torch.square(output_real - realy) * _weight
+                loss_real = torch.mean(loss_real)                
+                gw_real = torch.autograd.grad(loss_real, model_params, retain_graph=True)
+                gw_real = [_.detach().clone() for _ in gw_real]
 
                 nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
                 nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
@@ -233,20 +182,13 @@ class GradMatchCluster:
                 
                 _model.embed_forward(nm_input_syn)
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
+                #loss_syn = F.mse_loss(output_syn, syny)
+                loss_syn = torch.square(output_syn - syny) * _weight
+                loss_syn = torch.mean(loss_syn)
+                gw_syn = torch.autograd.grad(loss_syn, model_params, create_graph=True)
                 
-                # 분해된 loss 계산
-                total_loss_syn, trend_loss_syn, seasonality_loss_syn = calculate_decomposed_loss(output_syn, syny, _weight, period=6, model='additive', null_val=0.0)
-                
-                # 각 성분별 gradient 계산
-                gw_syn_trend = torch.autograd.grad(trend_loss_syn, model_params, create_graph=True)
-                gw_syn_seasonality = torch.autograd.grad(seasonality_loss_syn, model_params, create_graph=True)
-                
-                # 각 성분별 gradient matching loss 계산
-                _loss_trend = util.match_loss(gw_syn_trend, gw_real_trend, self.device)
-                _loss_seasonality = util.match_loss(gw_syn_seasonality, gw_real_seasonality, self.device)
-                
-                # 전체 loss는 각 성분별 loss의 가중 평균
-                _loss = 0.5 * _loss_trend + 0.5 * _loss_seasonality                
+                #pbar.close()
+                _loss = util.match_loss(gw_syn, gw_real, self.device)                
                 # gradient descent                
                 grad_loss += _loss.item()
                 optimizer.zero_grad()
@@ -265,36 +207,33 @@ class GradMatchCluster:
                     optimizer_model.zero_grad()
                     _model.embed_forward(nm_input_syn_in)
                     output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
-                    
-                    loss_syn_in = F.mse_loss(output_syn_in, syny_in)                    
+                    #loss_syn_in = F.mse_loss(output_syn_in, syny_in)
+                    loss_syn_in = torch.square(output_syn_in - syny_in) * _weight
+                    loss_syn_in = torch.mean(loss_syn_in)
                     loss_syn_in.backward()
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
             if (i+1) % args.check_freq == 0:                
-                min_i, val_loss, test_loss = self.test_syn()
-                print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
-                                
+                val_sum, test_sum = 0, 0
+                for j in range(5):
+                    min_i, val_loss, test_loss = self.test_syn()
+                    val_sum += val_loss
+                    test_sum += test_loss
+                    print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
-                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-                    
-                if min_val_loss > val_loss:
-                    min_val_loss = val_loss
+                    val_avg = val_sum/5
+                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_avg}, test loss: {test_sum/5}\n")
+                if min_val_loss > val_avg:
+                    min_val_loss = val_avg
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()                    
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
                   
 
-# python -m DC.distill_mtgnn_cluster -de 0 -d ../data/GBA_24 -e 300 -sp results/dc_gba_cluster -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 5
-# python -m DC.distill_mtgnn_cluster -de 0 -d ../data/ERA5_24 -e 300 -sp results/dc_era5_cluster -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 5
-
-
-# python -m DC.distill_mtgnn -de 0 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 1e-2 -nrr 0.2 -b 256 -ned 32
-# python -m DC.distill_mtgnn -de 2 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 256
-# python -m DC.distill_mtgnn -de 2 -d ../data/AIR_DATA -e 300 -sp results/dc_air_data_2e-3 -lrf 1e-2 -lrs 1e-2 -srr 2e-2 -nrr 1e-1
-# python -m DC.distill_mtgnn -de 6 -d ../data/ELECTRICITY -e 300 -sp results/dc_elec_2e-3 -lrf 1e-2 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 256 -ned 16
-# python -m DC.distill_mtgnn -de 7 -d ../data/SOLAR -e 300 -sp results/dc_solar_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 128
-# python -m DC.distill_mtgnn -de 0 -d ../data/TRAFFIC -e 300 -sp results/dc_traffic_2e-3 -lrf 1e-3 -lrs 1e-3 -srr 1e-2 -nrr 0.2 -b 64 -ned 64
+# python -m DC.distill_mtgnn_cluster -de 2 -d ../data/GBA -e 100 -sp results/dc_gba_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 0 -c 5
+# python -m DC.distill_mtgnn_cluster -de 3 -d ../data/GLA -e 100 -sp results/dc_gla_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 1 -c 1
+# python -m DC.distill_mtgnn_cluster -de 2 -d ../data/ERA5 -e 100 -sp results/dc_era5_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 32 -ned 128 -s 0 -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -307,9 +246,10 @@ if __name__ == "__main__":
     parser.add_argument('-srr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
-    parser.add_argument('-s', '--seed', type=int, default=5, help='')
+    parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
+    
     args = parser.parse_args()
     
     # random seed setting
@@ -320,7 +260,7 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     #device = torch.device(f"cpu")
-    dataloader =  util.load_dataset(args.data, args.batch_size, True, args.node_reduce_rate, device)
+    dataloader =  util.load_dataset(args.data, args.batch_size, "1", args.node_reduce_rate, device)
     print("load finish")
 
     algo = GradMatchCluster(dataloader, args, device)    

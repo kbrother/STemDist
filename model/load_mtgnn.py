@@ -14,27 +14,53 @@ import copy
 import torch.nn.functional as F
 
 
-def test_syn(args, data, synx, syny, device):    
+def test_syn(args, data, raw_data, device):
+    synx = raw_data['x'].to(device)
+    syny = raw_data['y'].to(device)
+    if 'w' in raw_data:
+        _weight = raw_data['w'].to(device)
+    else:
+        _weight = None
+    print("load finish")
+    print(synx.shape)
+    print(syny.shape)
+
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]    
     seq_len = dataloader['train_loader'].xs.shape[1]    
     out_dim = 1
     _model = gtnet(True, True, 2, num_nodes, 
-                  device, predefined_A=None, use_static_feat=False,
+                  device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim)      
     _model.to(device)
     optimizer = torch.optim.Adam(params=_model.parameters(), lr=args.lr)
     _model = _model.to(device)
    
+    nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
+    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
+    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
+    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
+    
+    nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
+    nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
+    nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
+    min_val_mse = sys.float_info.max
+
     min_val_loss = sys.float_info.max
     for i in tqdm(range(args.epochs)):
         _model.train()
+        _model.embed_forward(nm_input_syn)
         output_syn = _model(synx.transpose(1, 3)).squeeze()
-        loss_syn = F.mse_loss(output_syn, syny)
+        if _weight is None:
+            loss_syn = F.mse_loss(output_syn, syny)
+        else:
+            loss_syn = torch.square(output_syn - syny) * _weight
+            loss_syn = torch.mean(loss_syn)
+            #loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
         loss_syn.backward()
         optimizer.step()
@@ -42,9 +68,10 @@ def test_syn(args, data, synx, syny, device):
         _model.eval()
         if (i+1)%10 == 0:
             with torch.no_grad():
+                _model.embed_forward(nm_input_real)
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
-                test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
-            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}, test loss: {test_loss}")
+    
+            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
                 min_val_loss = val_loss
@@ -52,14 +79,16 @@ def test_syn(args, data, synx, syny, device):
 
     _model.load_state_dict(min_params)
     _model.eval()
-    with torch.no_grad():        
+    with torch.no_grad():    
+        _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
 
 
-# python -m model.load_mtgnn -de 6 -d ../data/GBA -lr 0.01 -e 100 -b 128 -ned 32 -lp results/dc_dsa_gba_sparse.pt
-# python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA_24 -lr 0.001 -e 200 -b 128 -lp results/random_gla.pt
-# python -m model.load_mtgnn_baseline -de 1 -d ../data/ERA5 -lr 0.001 -e 400 -b 128 -lp results/random_era5.pt
+# python -m model.load_mtgnn -de 3 -d ../data/GBA -lr 0.01 -e 400 -b 128 -lp results/dc_gba.pt -s 0 -ned 32
+# python -m model.load_mtgnn -de 2 -d ../data/GLA -lr 0.01 -e 400 -b 128 -lp results/dc_gla_1e-2.pt -s 0 -ned 32
+# python -m model.load_mtgnn -de 2 -d ../data/ERA5 -lr 0.01 -e 400 -b 128 -lp results/dc_dsa_cluster_era5_1e-3.pt -s 0 -ned 32
+# python -m model.load_mtgnn -de 1 -d ../data/AURORA -lr 3e-4 -e 200 -b 32 -lp results/dc_aurora_1e-3.pt -s 0 -ned 32
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -69,7 +98,8 @@ if __name__ == "__main__":
     parser.add_argument('-lr', '--lr',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
-    parser.add_argument('-lp', '--load_path', type=str, default='results/') 
+    parser.add_argument('-lp', '--load_path', type=str, default='results/')
+    parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
     args = parser.parse_args()
 
     # random seed setting
@@ -82,10 +112,4 @@ if __name__ == "__main__":
     dataloader = util.load_dataset(args.data, args.batch_size)
 
     raw_data = torch.load(args.load_path)
-    synx = raw_data['x'].to(device)
-    syny = raw_data['y'].to(device)
-    print("load finish")
-    print(synx.shape)
-    print(syny.shape)
-
-    test_syn(args, dataloader, synx, syny, device)
+    test_syn(args, dataloader, raw_data, device)

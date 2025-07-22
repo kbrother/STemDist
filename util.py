@@ -23,6 +23,7 @@ class DataLoader(object):
         self.num_batch = math.ceil(self.size/self.batch_size)        
         self.xs = xs  # num series x 12 x num nodes x 2
         self.xs_orig = xs
+        self.ys_orig = ys
         self.ys = ys
 
 
@@ -57,39 +58,39 @@ class DataLoader(object):
             x_i = self.xs[start_ind: self.size,...]
             y_i = self.ys[start_ind: self.size, ...]        
             self.current_ind = 0
-        
+            self.shuffle()
+            
         return (x_i, y_i)
 
 
-class DataLoaderCluster_cpu(DataLoader):
-    def __init__(self, xs, ys, batch_size, num_clusters):
-        self.batch_size = batch_size
-        self.current_ind = 0
-        self.size = len(xs)
-        self.num_batch = math.ceil(self.size/self.batch_size)        
-
-        # num series x 12 x num nodes x 2
-        self.xs_orig = xs
+class DataLoaderCluster2(DataLoader):
+    def __init__(self, xs, ys, batch_size, num_clusters, device):
+        super().__init__(xs, ys, batch_size)
+        kmeans = KMeans(n_clusters=num_clusters, mode='euclidean', init_method="kmeans++")
         xs = np.transpose(xs, (2, 0, 1, 3))  # num nodes x num sereis x 12 x 2
         num_nodes, num_series = xs.shape[0], xs.shape[1]
         seq_len, num_feat = xs.shape[2], xs.shape[3]
         xs = np.reshape(xs, (num_nodes, -1))   # num nodes x ... 
-        kmeans = KMeans(n_clusters=num_clusters).fit(xs)
-        xs = kmeans.cluster_centers_  # num nodes x ...
+        input_xs = torch.tensor(xs, device=device, dtype=torch.float)
+        labels = kmeans.fit_predict(input_xs).cpu().numpy()        
+        xs = kmeans.centroids.cpu().numpy()  # num nodes x ...
         xs = np.reshape(xs, (num_clusters, num_series, seq_len, num_feat))
-        xs = np.transpose(xs, (1,2,0,3))
+        xs = np.transpose(xs, (1,2,0,3))        
+        self.xs_reduced = xs   
         
-        self.xs = xs        
-        self.ys = np.zeros((num_series, seq_len, num_clusters))
-        label_cnt = [0 for _ in range(num_clusters)]
+        self.ys_reduced = np.zeros((num_series, seq_len, num_clusters))
+        self.label_cnt = [0 for _ in range(num_clusters)]
         for i in range(num_nodes):
-            self.ys[:, :, kmeans.labels_[i]] = self.ys[:, :, kmeans.labels_[i]] + ys[:, :, i]
-            label_cnt[kmeans.labels_[i]] += 1
-
-        self.label_cnt = label_cnt
+            self.ys_reduced[:, :, labels[i]] = self.ys_reduced[:, :, labels[i]] + ys[:, :, i]
+            self.label_cnt[labels[i]] += 1
         for i in range(num_clusters):
-            self.ys[:,:,i] = self.ys[:,:,i]/label_cnt[i]
-            
+            self.ys_reduced[:,:,i] = self.ys_reduced[:,:,i]/self.label_cnt[i]
+        
+        self.node2cluster = [-1 for _ in range(num_nodes)]
+        for n, l in enumerate(labels):            
+            self.node2cluster[n] = l
+        self.node2cluster = np.array(self.node2cluster)
+
 
 class DataLoaderCluster(DataLoader):
     def __init__(self, xs, ys, batch_size, num_clusters, device):
@@ -140,7 +141,7 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def load_dataset(dataset_dir, batch_size, do_cluster=False, _ratio=1.0, device=None):
+def load_dataset(dataset_dir, batch_size, loader_type=None, _ratio=1.0, device=None):
     data = {}
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
@@ -154,9 +155,13 @@ def load_dataset(dataset_dir, batch_size, do_cluster=False, _ratio=1.0, device=N
         for category in ['train', 'val', 'test']:
             data['x_' + category][..., i] = scaler_list[i].transform(data['x_' + category][..., i])
 
-    if do_cluster:
+    if loader_type is not None:
         num_clusters = round(_ratio * data['x_train'].shape[2])
-        data['train_loader'] = DataLoaderCluster(data['x_train'], data['y_train'], batch_size, num_clusters, device)
+
+        if loader_type == "1":
+            data['train_loader'] = DataLoaderCluster(data['x_train'], data['y_train'], batch_size, num_clusters, device)
+        else:
+            data['train_loader'] = DataLoaderCluster2(data['x_train'], data['y_train'], batch_size, num_clusters, device)
     else:
         data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
 

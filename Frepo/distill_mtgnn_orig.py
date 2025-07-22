@@ -29,32 +29,38 @@ class Frepo(DataDistill):
 
         min_val_loss = sys.float_info.max
         optimizer_feat = torch.optim.Adam([self.synx, self.syny], lr=args.lr_feat)
-        for i in tqdm(range(args.epochs)):        
-            data['train_loader'].shuffle()           
-            _model = gtnet(True, True, 2, num_nodes, 
+
+        num_model = 3
+        model_list = [gtnet(True, True, 2, num_nodes, 
                       device, predefined_A=None, use_static_feat=False,
                       dropout=0.3, subgraph_size=20,
                       node_dim=10, dilation_exponential=1,             
                       seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
-                      layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)   
-            _model = _model.to(device)
+                      layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True).to(device) for _ in range(num_model)]
 
-            _model.to(self.device)
-            optimizer_model = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
-            train_loss, num_loop = 0, 0
+        optimizer_list = [torch.optim.Adam(model_list[i].parameters(), lr=args.lr_syn) for i in range(num_model)]
+        update_cnt = [0 for _ in range(num_model)]
+        
+        for i in tqdm(range(args.epochs)):        
+            train_loss = 0
+            num_loop = 0
 
             data['train_loader'].shuffle()
-            data['train_loader'].current_ind = 0  
-            for il in range(args.k):
-                x, y = data['train_loader'].get_next()                      
-                _model.eval()
+            data['train_loader'].current_ind = 0    
+            while num_loop < 10:
+                x, y = data['train_loader'].get_next() 
+                curr_idx = random.randint(0, num_model-1)
+                curr_model = model_list[curr_idx]
+                curr_optimizer = optimizer_list[curr_idx]
+                
+                curr_model.eval()
                 realx = torch.tensor(x, device=device, dtype=torch.float)                
                 realx = realx.transpose(1, 3)
                 realy = torch.tensor(y, device=device, dtype=torch.float)          
-                output_real = _model(realx).squeeze()  # batch x 12 x num nodes
+                output_real = curr_model(realx).squeeze()  # batch x 12 x num nodes
                 output_real = output_real.reshape(output_real.shape[0], -1)  # batch x 12*num_nodes
 
-                output_syn = _model(self.synx.transpose(1, 3)).squeeze()  # batch x 12 x num nodes
+                output_syn = curr_model(self.synx.transpose(1, 3)).squeeze()  # batch x 12 x num nodes
                 output_syn = output_syn.reshape(output_syn.shape[0], -1)  # batch x 12*num_nodes
 
                 K_ts = torch.mm(output_real, output_syn.T)
@@ -70,15 +76,30 @@ class Frepo(DataDistill):
                 optimizer_feat.step()
                 train_loss += _loss.item()
                 num_loop += 1
-
-                _model.train()
+                
+                curr_model.train()
                 synx_in, syny_in = self.synx.detach(), self.syny.detach()
-                optimizer_model.zero_grad()
-                output_syn_in = _model(synx_in.transpose(1,3)).squeeze()
+                curr_optimizer.zero_grad()
+                output_syn_in = curr_model(synx_in.transpose(1,3)).squeeze()
                 loss_syn_in = F.mse_loss(output_syn_in, syny_in)
                 loss_syn_in.backward()
-                optimizer_model.step()
+                curr_optimizer.step()
 
+                update_cnt[curr_idx] += 1
+                #print(update_cnt[curr_idx])
+                if update_cnt[curr_idx] >= 10:
+                    model_list[curr_idx] = gtnet(True, True, 2, num_nodes, 
+                                              device, predefined_A=None, use_static_feat=False,
+                                              dropout=0.3, subgraph_size=20,
+                                              node_dim=10, dilation_exponential=1,             
+                                              seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
+                                              layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True).to(device) 
+                    optimizer_list[curr_idx] = torch.optim.Adam(model_list[curr_idx].parameters(), lr=args.lr_syn)
+                    update_cnt[curr_idx] = 0
+                
+                if data['train_loader'].current_ind == 0:
+                    data['train_loader'].shuffle()
+                    
             print(f"epoch: {i}, train loss: {train_loss/num_loop}")
             if (i+1) % args.check == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
@@ -92,9 +113,9 @@ class Frepo(DataDistill):
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
 
 
-# python -m Frepo.distill_mtgnn_orig -de 6 -d ../data/GBA -e 300 -sp results/frepo_gba -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1 -k 5
-# python -m Frepo.distill_mtgnn_orig -de 5 -d ../data/GLA -e 300 -sp results/frepo_gla -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1
-# python -m Frepo.distill_mtgnn_orig -de 4 -d ../data/ERA5 -e 300 -sp results/frepo_era5 -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 5 -k 5
+# python -m Frepo.distill_mtgnn_orig -de 2 -d ../data/GBA_24 -e 100 -sp results/frepo_gba -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1 
+# python -m Frepo.distill_mtgnn_orig -de 3 -d ../data/GLA_24 -e 100 -sp results/frepo_gla -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 1 
+# python -m Frepo.distill_mtgnn_orig -de 4 -d ../data/ERA5_24 -e 100 -sp results/frepo_era5 -lrf 1e-3 -lrs 1e-3 -rr 1e-2 -b 128 -c 5 
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -108,7 +129,6 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check',type=int,default=5,help='')
-    parser.add_argument('-k', '--k',type=int,default=5,help='')
     
     args = parser.parse_args()
     
