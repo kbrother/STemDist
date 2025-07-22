@@ -8,7 +8,7 @@ import math
 import random
 from sklearn.cluster import KMeans
 from fast_pytorch_kmeans import KMeans
-
+from sklearn.metrics import pairwise_distances
 
 class DataLoader(object):
     def __init__(self, xs, ys, batch_size):
@@ -92,6 +92,37 @@ class DataLoaderCluster2(DataLoader):
         self.node2cluster = np.array(self.node2cluster)
 
 
+def robust_kmeans(xs, num_clusters, num_series, seq_len, num_feat, device='cuda'):
+    input_xs = torch.tensor(xs, device=device, dtype=torch.float)
+    kmeans = KMeans(n_clusters=num_clusters, mode='euclidean', init_method="kmeans++")
+    labels = kmeans.fit_predict(input_xs).cpu().numpy()
+    centroids = kmeans.centroids.cpu().numpy()  # (K, D)
+    counts = np.bincount(labels, minlength=num_clusters)
+    for empty_cluster in np.where(counts == 0)[0]:
+        largest_cluster = np.argmax(counts)
+        idx_in_largest = np.where(labels == largest_cluster)[0]
+        largest_points = input_xs[idx_in_largest].cpu().numpy()    # 해당 클러스터 내에서 centroid와 가장 먼 점 찾기
+        centroid_largest = centroids[largest_cluster:largest_cluster+1]
+        dists = pairwise_distances(largest_points, centroid_largest)
+        farthest_idx_local = np.argmax(dists)
+        farthest_idx = idx_in_largest[farthest_idx_local]
+
+        labels[farthest_idx] = empty_cluster
+        counts[largest_cluster] -= 1
+        counts[empty_cluster] += 1
+
+    centroids = []
+    for k in range(num_clusters):
+        member_idx = np.where(labels == k)[0]
+        centroid_k = np.mean(xs[member_idx], axis=0)
+        centroids.append(centroid_k)
+    centroids = np.stack(centroids, axis=0)
+    xs_clustered = np.reshape(centroids, (num_clusters, num_series, seq_len, num_feat))
+    xs_clustered = np.transpose(xs_clustered, (1, 2, 0, 3))  # [num_series, seq_len, num_clusters, num_feat]
+
+    return xs_clustered, labels
+
+
 class DataLoaderCluster(DataLoader):
     def __init__(self, xs, ys, batch_size, num_clusters, device):
         self.batch_size = batch_size
@@ -106,14 +137,8 @@ class DataLoaderCluster(DataLoader):
         seq_len, num_feat = xs.shape[2], xs.shape[3]
         xs = np.reshape(xs, (num_nodes, -1))   # num nodes x ... 
 
-        kmeans = KMeans(n_clusters=num_clusters, mode='euclidean', init_method="kmeans++")
-        input_xs = torch.tensor(xs, device=device, dtype=torch.float)
-        labels = kmeans.fit_predict(input_xs).cpu().numpy()        
-        xs = kmeans.centroids.cpu().numpy()  # num nodes x ...
-        xs = np.reshape(xs, (num_clusters, num_series, seq_len, num_feat))
-        xs = np.transpose(xs, (1,2,0,3))
-        
-        self.xs = xs        
+        xs_clustered, labels = robust_kmeans(xs, num_clusters, num_series, seq_len, num_feat, device)
+        self.xs = xs_clustered        
         self.ys = np.zeros((num_series, seq_len, num_clusters))
         label_cnt = [0 for _ in range(num_clusters)]
         for i in range(num_nodes):
@@ -122,6 +147,10 @@ class DataLoaderCluster(DataLoader):
 
         self.label_cnt = label_cnt
         for i in range(num_clusters):
+            # if label_cnt[i] == 0:
+            #     print(f"!:label_cnt[{i}] is 0, num_clusters: {num_clusters}, num_nodes: {num_nodes}")
+            #     self.ys[:,:,i] = np.zeros((num_series, seq_len))
+            # else:
             self.ys[:,:,i] = self.ys[:,:,i]/label_cnt[i]
 
             
