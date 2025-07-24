@@ -47,12 +47,16 @@ class GradMatch:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
 
-        '''
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        val_sum, test_sum = 0, 0
+        num_iter = 3
+        for i in range(num_iter):
+            min_i, val_loss, test_loss = self.test_syn()
+            print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            val_sum += val_loss
+            test_sum += test_loss
         with open(args.save_path + ".txt", 'a') as f:
-            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-        '''
+            f.write(f"initial, min i: {min_i}, val loss: {val_sum/num_iter}, test loss: {test_sum/num_iter}\n")
+
         
     def test_syn(self):
         args = self.args
@@ -106,6 +110,8 @@ class GradMatch:
                     min_i = i
                     min_val_loss = val_loss
                     min_params = copy.deepcopy(_model.state_dict())
+
+                print(val_loss)
 
         _model.load_state_dict(min_params)
         _model.eval()
@@ -206,7 +212,7 @@ class GradMatch:
             if (i+1) % args.check == 0:       
                 val_sum, test_sum = 0, 0
                 for j in range(3):
-                    set_seed(j)
+                    #set_seed(j)
                     min_i, val_loss, test_loss = self.test_syn()
                     val_sum += val_loss
                     test_sum += test_loss
@@ -230,8 +236,9 @@ def set_seed(seed):
     
 # python -m DC.distill_mtgnn -de 1 -d ../data/GBA -e 100 -sp results/dc_gba_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -c 5
 # python -m DC.distill_mtgnn -de 1 -d ../data/GLA -e 100 -sp results/dc_gla_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -c 5
-# python -m DC.distill_mtgnn -de 3 -d ../data/ERA5 -e 100 -sp results/dc_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 32 -ned 32 -c 5
-# python -m DC.distill_mtgnn -de 2 -d ../data/AURORA -e 100 -sp results/dc_aurora_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 32 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 2 -d ../data/ERA5 -e 100 -sp results/dc_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 32 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 0 -d ../data/AURORA -e 100 -sp results/dc_aurora_1e-2_1e-3_2 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 32 -s 1 -ned 32 -c 5
+# python -m DC.distill_mtgnn -de 4 -d ../data/CA -e 100 -sp results/dc_ca_1e-2_1e-3_2 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 32 -s 1 -ned 32 -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

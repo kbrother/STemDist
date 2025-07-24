@@ -52,8 +52,13 @@ def test_syn(args, data, raw_data, device):
     num_sample = round(synx.shape[2]/4)
     for i in tqdm(range(args.epochs)):
         _model.train()
+        _order = list(range(synx.shape[2]))
+        random.shuffle(_order)
         for j in range(4):
-            _idx = random.sample(range(synx.shape[2]), num_sample)
+            if j < 3:
+                _idx = _order[num_sample*j:num_sample*(j+1)]
+            else:
+                _idx = _order[num_sample*j:]     
             curr_weight = _weight[:,:,_idx] / torch.sum(_weight[:,:,_idx]) * num_sample
             _model.embed_forward(nm_input_syn[_idx])
             output_syn = _model(synx[:,:,_idx,:].transpose(1, 3)).squeeze()
@@ -65,13 +70,12 @@ def test_syn(args, data, raw_data, device):
             optimizer.step()
         
         _model.eval()
-        if (i+1)%5 == 0:
+        if (i+1)%10 == 0:
             with torch.no_grad():
                 _model.embed_forward(nm_input_real)
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
-                test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     
-            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}, test loss: {test_loss}")
+            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
                 min_val_loss = val_loss
@@ -85,10 +89,11 @@ def test_syn(args, data, raw_data, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
 
 
-# python -m model.load_mtgnn_dsa -de 0 -d ../data/GBA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gba_1e-3.pt -s 0 -ned 32
-# python -m model.load_mtgnn_dsa -de 2 -d ../data/GLA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gla_1e-3.pt -s 0 -ned 32
-# python -m model.load_mtgnn_dsa -de 1 -d ../data/ERA5 -lr 0.001 -e 200 -b 128 -lp results/dc_dsa_cluster_era5_1e-3.pt -s 0 -ned 32
-# python -m model.load_mtgnn_dsa -de 0 -d ../data/AURORA -lr 1e-3 -e 100 -b 64 -lp results/dc_dsa_cluster_aurora_1e-3_1e-3_final.pt -s 0 -ned 32
+# python -m model.load_mtgnn_dsa2 -de 4 -d ../data/GBA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gba_1e-3_1e-3.pt -s 0 -ned 32
+# python -m model.load_mtgnn_dsa2 -de 4 -d ../data/GLA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gla_1e-3_1e-3.pt -s 0 -ned 32
+# python -m model.load_mtgnn_dsa2 -de 0 -d ../data/ERA5 -lr 0.001 -e 100 -b 128 -lp results/dc_dsa_cluster_era5_1e-3_1e-3.pt -s 0 -ned 32
+# python -m model.load_mtgnn_dsa2 -de 4 -d ../data/AURORA -lr 1e-3 -e 100 -b 64 -lp results/dc_dsa_cluster_aurora_1e-2_1e-3.pt -s 0 -ned 32
+# python -m model.load_mtgnn_dsa2 -de 0 -d ../data/CA -lr 1e-3 -e 100 -b 32 -lp results/dc_dsa_cluster_ca_1e-2_1e-3.pt -s 0 -ned 16
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

@@ -44,8 +44,7 @@ class GradMatchCluster:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
-
-        '''
+        
         val_sum, test_sum = 0, 0
         num_iter = 3
         for i in range(num_iter):
@@ -55,7 +54,6 @@ class GradMatchCluster:
             test_sum += test_loss
         with open(args.save_path + ".txt", 'a') as f:
             f.write(f"initial, min i: {min_i}, val loss: {val_sum/num_iter}, test loss: {test_sum/num_iter}\n")
-        '''
         
     
     def test_syn(self):
@@ -97,8 +95,14 @@ class GradMatchCluster:
         num_sample = round(self.num_nodes/4)
         for i in tqdm(range(100)):  
             _model.train()
-            for j in range(4):
-                _idx = random.sample(range(self.num_nodes), num_sample)
+            _order = list(range(self.num_nodes))
+            random.shuffle(_order)
+            for j in range(4):                
+                if j < 3:
+                    _idx = _order[num_sample*j:num_sample*(j+1)]
+                else:
+                    _idx = _order[num_sample*j:]                                
+                    
                 curr_weight = _weight[:,:,_idx] / torch.sum(_weight[:,:,_idx]) * num_sample
                 _model.embed_forward(nm_input_syn[_idx])
                 output_syn = _model(synx[:,:,_idx,:].transpose(1,3)).squeeze()
@@ -120,6 +124,7 @@ class GradMatchCluster:
                     min_val_loss = val_loss
                     min_params = copy.deepcopy(_model.state_dict())
 
+                print(val_loss)
         _model.load_state_dict(min_params)
         _model.eval()
         with torch.no_grad():
@@ -172,12 +177,18 @@ class GradMatchCluster:
             grad_loss = 0
             num_ol = 20
             num_real_total = 0
-            for ol in range(num_ol):                
+            for ol in range(num_ol):         
+
+                _order = list(range(self.num_nodes))
+                random.shuffle(_order)                
+                x, y = data['train_loader'].get_next()                                
+                realx = torch.tensor(x, device=self.device, dtype=torch.float)
+                realy = torch.tensor(y, device=self.device, dtype=torch.float)  
                 for ii in range(4):
-                    x, y = data['train_loader'].get_next()                                
-                    realx = torch.tensor(x, device=self.device, dtype=torch.float)
-                    realy = torch.tensor(y, device=self.device, dtype=torch.float)  
-                    _idx = random.sample(range(self.num_nodes), num_sample)
+                    if ii < 3:
+                        _idx = _order[num_sample*ii:num_sample*(ii+1)]
+                    else:
+                        _idx = _order[num_sample*ii:]                                                      
                     curr_weight = _weight[:,:,_idx] / torch.sum(_weight[:,:,_idx]) * num_sample
                     _model.embed_forward(nm_input_real[_idx])                    
                     
@@ -216,8 +227,13 @@ class GradMatchCluster:
                 nm_input_syn_in = torch.transpose(nm_input_syn_in, 0, 1)  # num nodex x seq_length x in_dim
                 nm_input_syn_in = torch.reshape(nm_input_syn_in, (self.num_nodes, -1))
                 for il in range(num_il):
+                    _order = list(range(self.num_nodes))
+                    random.shuffle(_order)        
                     for ii in range(4):
-                        _idx = random.sample(range(self.num_nodes), num_sample)          
+                        if ii < 3:
+                            _idx = _order[num_sample*ii:num_sample*(ii+1)]
+                        else:
+                            _idx = _order[num_sample*ii:]       
                         curr_weight = _weight[:,:,_idx] / torch.sum(_weight[:,:,_idx]) * num_sample
                         _model.embed_forward(nm_input_syn_in[_idx])                    
                         output_syn_in = _model(synx_in[:,:,_idx,:].transpose(1,3)).squeeze()
@@ -233,7 +249,6 @@ class GradMatchCluster:
                 val_sum, test_sum = 0, 0
                 num_iter = 3
                 for j in range(num_iter):
-                    set_seed(j)
                     min_i, val_loss, test_loss = self.test_syn()
                     val_sum += val_loss
                     test_sum += test_loss
@@ -248,17 +263,10 @@ class GradMatchCluster:
                     torch.save({'x':synx_, 'y':syny_ ,'w': _weight}, args.save_path + ".pt")
                   
 
-def set_seed(seed):
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed(args.seed)
-    
-# python -m DC.distill_mtgnn_cluster_dsa -de 2 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 0 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa -de 3 -d ../data/GLA -e 100 -sp results/dc_dsa_cluster_gla_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 1 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa -de 2 -d ../data/ERA5 -e 100 -sp results/dc_dsa_cluster_era5_1e-3 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa_3 -de 1 -d ../data/AURORA -e 100 -sp results/dc_dsa_cluster_aurora_3_new -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa_3 -de 4 -d ../data/AURORA -e 100 -sp results/dc_dsa_cluster_aurora_1e-3_1e-3_final -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
+# python -m DC.distill_mtgnn_cluster_dsa_4 -de 2 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 1 -c 5
+# python -m DC.distill_mtgnn_cluster_dsa_4 -de 3 -d ../data/GLA -e 100 -sp results/dc_dsa_cluster_gla_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 2 -c 5
+# python -m DC.distill_mtgnn_cluster_dsa_4 -de 1 -d ../data/ERA5 -e 100 -sp results/dc_dsa_cluster_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
+# python -m DC.distill_mtgnn_cluster_dsa_4 -de 1 -d ../data/AURORA -e 100 -sp results/dc_dsa_cluster_aurora_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 1 -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

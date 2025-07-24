@@ -13,8 +13,8 @@ import sys
 
 
 # python -m model.train_mtgnn_cluster -de 4 -d ../data/GLA -lr 1e-2 -e 100 -s 0 -r 0.1 -ned 128 -b 128 -sp results/gla_cluster.txt
-# python -m model.train_mtgnn_cluster -de 2 -d ../data/GBA -lr 1e-2 -e 100 -s 0 -r 0.1 -ned 128 -b 128 -sp results/gba_cluster.txt
-# python -m model.train_mtgnn_cluster -de 2 -d ../data/ERA5 -lr 1e-2 -e 100 -s 0 -r 0.1 -ned 128 -b 32 -sp results/era5_cluster.txt
+# python -m model.train_mtgnn_cluster -de 0 -d ../data/GBA -lr 1e-2 -e 200 -s 0 -r 0.1 -ned 128 -b 128 -sp results/gba_cluster.txt -s 2
+# python -m model.train_mtgnn_cluster -de 3 -d ../data/ERA5_24 -lr 1e-2 -e 100 -s 0 -r 0.1 -ned 32 -b 128 -sp results/era5_cluster.txt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     start_time = time.time()
-    dataloader = util.load_dataset(args.data, args.batch_size, True, args.ratio, device)
+    dataloader = util.load_dataset(args.data, args.batch_size, "1", args.ratio, device)
     print(f"load finish, time: {time.time() - start_time}")
     
     scaler = dataloader['scaler']
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
     _weight = _weight / torch.sum(_weight)
     _weight = _weight.unsqueeze(0).unsqueeze(0)
-    for i in range(args.epochs):
+    for i in range(args.epochs):        
         model.train()        
         dataloader['train_loader'].shuffle()           
         for it, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())):        

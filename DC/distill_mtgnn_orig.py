@@ -164,7 +164,7 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 10 == 0:                
+            if (i+1) % 5 == 0:                
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
@@ -177,12 +177,7 @@ class GradMatch:
                   
 
 
-# python -m DC.distill_mtgnn_orig -de 2 -d ../data/METR-LA -e 300 -sp results/dc_metr_la_2e-3 -lrf 1e-2 -lrs 1e-2 -rr 2e-3 -b 256
-# python -m DC.distill_mtgnn_orig -de 0 -d ../data/PEMS-BAY -e 300 -sp results/dc_pems_bay_2e-3 -lrf 1e-2 -lrs 1e-3 -rr 2e-3 -b 256
-# python -m DC.distill_mtgnn_orig -de 7 -d ../data/AIR-DATA -e 300 -sp results/dc_air_data_2e-3 -lrf 1e-2 -lrs 1e-3 -rr 2e-3 -b 256
-# python -m DC.distill_mtgnn_orig -de 0 -d ../data/ELECTRICITY -e 300 -sp results/dc_orig_elec -lrf 1e-2 -lrs 1e-2 -rr 2e-3 -b 256
-# python -m DC.distill_mtgnn_orig -de 0 -d ../data/SOLAR -e 300 -sp results/dc_orig_solar_1e-2 -lrf 1e-2 -lrs 1e-2 -rr 2e-3 -b 256
-# python -m DC.distill_mtgnn_orig -de 2 -d ../data/TRAFFIC -e 300 -sp results/dc_orig_traffic_1e-3 -lrf 1e-2 -lrs 1e-3 -rr 2e-3 -b 256
+# python -m DC.distill_mtgnn_cluster -de 0 -d ../data/GBA -e 300 -sp results/debug -lrf 1e-3 -lrs 1e-2 -srr 1e-1 -nrr 0.1 -b 128
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
