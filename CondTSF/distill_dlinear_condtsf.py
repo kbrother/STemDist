@@ -1,0 +1,199 @@
+import torch
+import numpy as np
+import argparse
+from model.dlinear import DLinear
+from model.node_embed import *
+import util
+from tqdm import tqdm
+import random
+from model import *
+import math
+import sys
+from reparam_module import ReparamModule
+import copy
+
+class Traj_Matching:
+
+    def __init__(self, data, args, device):
+        self.data = data
+        self.args = args
+        self.device = device
+        self.num_series = int(args.series_reduce_rate * data['train_loader'].xs.shape[0])
+        scaler = data['scaler']        
+
+        # Define condensed data
+        num_series_total = data['train_loader'].xs.shape[0]
+        sampled_idx1 = random.sample(list(range(num_series_total)), self.num_series)
+        
+        self.synx = self.data['train_loader'].xs[sampled_idx1, :, :, 0]
+        self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)        
+        self.syny = self.data['train_loader'].ys[sampled_idx1, :, :]
+        self.syny = scaler.transform(self.syny)
+        self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
+
+        self.synx = nn.Parameter(self.synx)
+        self.syny = nn.Parameter(self.syny)
+ 
+        print(f'feat x shape: {self.synx.shape}')
+        print(f'feat y shape: {self.syny.shape}')
+
+
+    def test_syn(self):
+        args = self.args
+        data = self.data
+        synx = self.synx.detach().clone()
+        syny = self.syny.detach().clone()
+
+        scaler = data['scaler']
+        _model = DLinear(args.seq_length, args.seq_length)
+        _model.to(self.device)
+        optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
+        min_val_loss = sys.float_info.max
+    
+        for i in tqdm(range(200)):
+            _model.train()
+            output_syn = _model(synx).squeeze()
+            loss_syn = F.mse_loss(output_syn, syny)
+            optimizer.zero_grad()
+            loss_syn.backward()
+            optimizer.step()
+
+            _model.eval()
+            if (i+1)%10 == 0:
+                with torch.no_grad():
+                    val_loss = _model.test_model(data['val_loader'], scaler, device)
+    
+                if min_val_loss > val_loss:
+                    min_i = i
+                    min_val_loss = val_loss
+                    min_params = copy.deepcopy(_model.state_dict())
+
+        _model.load_state_dict(min_params)
+        _model.eval()
+        with torch.no_grad():
+            test_loss = _model.test_model(data['test_loader'], scaler, device)
+
+        return min_i, min_val_loss, test_loss
+
+
+    def train(self):
+        args = self.args
+        data = self.data
+        synx, syny = self.synx, self.syny        
+
+        optimizer = torch.optim.Adam([synx, syny], lr=args.lr_feat)
+        syn_lr = nn.Parameter(torch.FloatTensor(1).to(args.device))
+        syn_lr.data = torch.tensor(args.lr_teacher)
+        optimizer_lr = torch.optim.Adam([syn_lr], lr=args.lr_lr)
+
+        for i in tqdm(range(args.epochs)):
+            buffer_index = random.randint(0, args.num_experts - 1)
+            expert_traj = torch.load(args.params + f"replay_buffer_{buffer_index}.pt")
+            data['train_loader'].shuffle()
+
+            student_net = DLinear(seq_len=args.seq_length, pred_len=args.seq_length)
+            student_net.to(self.device)
+            student_net = ReparamModule(student_net)
+            student_net.train()
+            num_params = sum([np.prod(p.size()) for p in (student_net.parameters())])
+
+            start_epoch = np.random.randint(0, args.max_start_epoch)
+            starting_params = expert_traj[start_epoch]
+
+            target_params = expert_traj[start_epoch + args.expert_epoch]
+            target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)
+            student_params = torch.cat([p.data.to(self.device).reshape(-1) for p in starting_params], 0).requires_grad_(True)
+            start_params = torch.cat([p.data.to(self.device).reshape(-1) for p in starting_params], 0)
+
+            for _ in range(args.syn_steps):                
+                synx = torch.tensor(synx, device=device, dtype=torch.float)           
+                output_syn = student_net(synx, flat_param=student_params).squeeze()                
+                loss_syn = F.mse_loss(output_syn, syny)
+                grad = torch.autograd.grad(loss_syn, student_params, create_graph=True, allow_unused=True)[0]
+                student_params = student_params - syn_lr * grad
+
+
+            # CondTSF plugin
+            if i % 3 == 0:  
+                target_Y = student_net(synx, flat_param=target_params).squeeze().detach()
+                syny.data = (1 - args.beta) * syny.data + args.beta * target_Y
+
+            param_loss = torch.nn.functional.mse_loss(student_params, target_params, reduction="sum")
+            param_dist = torch.nn.functional.mse_loss(start_params, target_params, reduction="sum")
+
+            param_dist = param_dist / num_params
+            param_loss = param_loss / num_params
+            grand_loss = param_loss / param_dist
+
+
+            optimizer.zero_grad()
+            optimizer_lr.zero_grad()
+            grand_loss.backward()
+            optimizer.step()
+            optimizer_lr.step()
+
+            args.lr_teacher = syn_lr
+            
+            print(f"epoch:{i}, train loss: {grand_loss.item()}")
+            if (i+1)%10== 0:
+                min_i, val_loss, test_loss = self.test_syn()
+                val_loss = math.sqrt(val_loss)
+                test_loss = math.sqrt(test_loss)
+                print(f"epoch: {i}, min i: {min_i}, train_loss: {grand_loss.item()}, val loss: {val_loss}, test loss: {test_loss}")
+                
+                with open(args.save_path + ".txt", 'a') as f:
+                    f.write(f"epoch: {i}, min i: {min_i}, train_loss: {grand_loss.item()}, val loss: {val_loss}, test loss: {test_loss}\n")
+                
+                if val_loss < min_val_loss:
+                    min_val_loss = val_loss
+                    synx_ = synx.detach().clone().cpu()
+                    syny_ = syny.detach().clone().cpu()                    
+                    torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
+
+
+# python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/GBA' --params '../data/params/GBA-DLinear/' -sp results/tm_gba_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+# python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/GLA' --params '../data/params/GLA-DLinear/' -sp results/tm_gla_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+# python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/CA' --params '../data/params/CA-DLinear/' -sp results/tm_ca_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+# python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/ERA5' --params '../data/params/ERA5-DLinear/' -sp results/tm_era5_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+# python -m MTT.traj_matching_dlinear_condtsf -de 4 -e 300 -d '../data/AURORA' --params '../data/params/AURORA-DLinear/' -sp results/tm_aurora_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+
+
+if __name__ == "__main__":
+    torch.set_num_threads(4)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-de', '--device', type=int, default=0, help='')
+    parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
+    parser.add_argument('-b', '--batch_size', type=int, default=48, help='batch sizefor real data')#128
+    parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-3,help='learning rate for testing on synthetic data')
+    parser.add_argument('-lrf', '--lr_feat',type=float,default=0.1,help='learning rate for updating synthetic data')
+    parser.add_argument('-sr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
+    parser.add_argument('-e', '--epochs',type=int,default=100,help='')
+    parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/') 
+    parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
+    parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
+    parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
+    
+    parser.add_argument('--lr_teacher', type=float, default=5e-4, help='initialization for student params learning rate')
+    parser.add_argument('--lr_lr', type=float, default=1e-6, help='learning rate for updating... learning rate')
+    parser.add_argument('--num_experts', type=int, default=20, help='')
+    parser.add_argument('--params', type=str, default='../data/params/METR-LA-MTGNN/')
+    parser.add_argument('--max_start_epoch', type=int, default=4, help='max epoch we can start at')
+    parser.add_argument('--expert_epoch', type=int, default=2, help='how many expert epochs the target params are')
+    parser.add_argument('--syn_steps', type=int, default=10, help='how many steps to take on synthetic data')
+    parser.add_argument('--beta', type=float, default=0.01, help='CondTSF addtive ratio')
+
+    args = parser.parse_args()
+    
+    # random seed setting
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+
+    device = torch.device(f"cuda:{args.device}")
+    dataloader =  util.load_dataset(args.data, 128)
+    print("load finish")
+
+    algo = Traj_Matching(dataloader, args, device)    
+    algo.train()
