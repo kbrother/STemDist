@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import argparse
-from model.dlinear import DLinear
+from model.dlinear.dlinear import Model
 from model.node_embed import *
 import util
 from tqdm import tqdm
@@ -9,7 +9,7 @@ import random
 from model import *
 import math
 import sys
-from reparam_module import ReparamModule
+from CondTSF.reparam_module import ReparamModule
 import copy
 
 class Traj_Matching:
@@ -45,13 +45,15 @@ class Traj_Matching:
         syny = self.syny.detach().clone()
 
         scaler = data['scaler']
-        _model = DLinear(args.seq_length, args.seq_length)
+        num_nodes = data['train_loader'].xs.shape[2]
+        seq_len = data['train_loader'].xs.shape[1]
+        _model = Model(seq_len, seq_len, num_nodes)
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max
     
         for i in tqdm(range(200)):
-            _model.train()
+            _model.train()            
             output_syn = _model(synx).squeeze()
             loss_syn = F.mse_loss(output_syn, syny)
             optimizer.zero_grad()
@@ -85,13 +87,18 @@ class Traj_Matching:
         syn_lr = nn.Parameter(torch.FloatTensor(1).to(args.device))
         syn_lr.data = torch.tensor(args.lr_teacher)
         optimizer_lr = torch.optim.Adam([syn_lr], lr=args.lr_lr)
+        min_val_loss = sys.float_info.max
+
+        scaler = data['scaler']
+        num_nodes = data['train_loader'].xs.shape[2]
+        seq_len = data['train_loader'].xs.shape[1]
 
         for i in tqdm(range(args.epochs)):
             buffer_index = random.randint(0, args.num_experts - 1)
             expert_traj = torch.load(args.params + f"replay_buffer_{buffer_index}.pt")
             data['train_loader'].shuffle()
 
-            student_net = DLinear(seq_len=args.seq_length, pred_len=args.seq_length)
+            student_net = Model(seq_len, seq_len, num_nodes)
             student_net.to(self.device)
             student_net = ReparamModule(student_net)
             student_net.train()
@@ -104,10 +111,11 @@ class Traj_Matching:
             target_params = torch.cat([p.data.to(self.device).reshape(-1) for p in target_params], 0)
             student_params = torch.cat([p.data.to(self.device).reshape(-1) for p in starting_params], 0).requires_grad_(True)
             start_params = torch.cat([p.data.to(self.device).reshape(-1) for p in starting_params], 0)
-
-            for _ in range(args.syn_steps):                
-                synx = torch.tensor(synx, device=device, dtype=torch.float)           
-                output_syn = student_net(synx, flat_param=student_params).squeeze()                
+                      
+            for _ in range(args.syn_steps):
+                # print(synx.shape())
+                output_syn = student_net(synx, flat_param=student_params).squeeze()       
+                synx = torch.tensor(synx, device=device, dtype=torch.float) 
                 loss_syn = F.mse_loss(output_syn, syny)
                 grad = torch.autograd.grad(loss_syn, student_params, create_graph=True, allow_unused=True)[0]
                 student_params = student_params - syn_lr * grad
@@ -135,7 +143,7 @@ class Traj_Matching:
             args.lr_teacher = syn_lr
             
             print(f"epoch:{i}, train loss: {grand_loss.item()}")
-            if (i+1)%10== 0:
+            if (i+1)%5== 0:
                 min_i, val_loss, test_loss = self.test_syn()
                 val_loss = math.sqrt(val_loss)
                 test_loss = math.sqrt(test_loss)
@@ -155,7 +163,8 @@ class Traj_Matching:
 # python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/GLA' --params '../data/params/GLA-DLinear/' -sp results/tm_gla_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
 # python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/CA' --params '../data/params/CA-DLinear/' -sp results/tm_ca_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
 # python -m MTT.traj_matching_dlinear_condtsf -de 3 -e 1000 -d '../data/ERA5' --params '../data/params/ERA5-DLinear/' -sp results/tm_era5_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
-# python -m MTT.traj_matching_dlinear_condtsf -de 4 -e 300 -d '../data/AURORA' --params '../data/params/AURORA-DLinear/' -sp results/tm_aurora_condtsf.txt -lrf 1e-2 -lrs 1e-3 -sr 0.01
+
+# python -m CondTSF.distill_dlinear_condtsf -de 0 -e 300 -d '../data/AURORA_final' --params '../data/params/AURORA-Dlinear/' -sp results/condtsf_aurora -sr 0.005 -lrf 1e-2 -lrs 1e-3 
 
 
 if __name__ == "__main__":
