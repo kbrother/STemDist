@@ -40,11 +40,11 @@ def test_syn(args, data, synx, syny, device):
         optimizer.step()
 
         _model.eval()
-        if (i+1)%10 == 0:
+        if (i+1)%5 == 0:
             with torch.no_grad():
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
-                test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
-            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}, test loss: {test_loss}")
+                #test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+            print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
                 min_val_loss = val_loss
@@ -57,9 +57,10 @@ def test_syn(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
 
 
-# python -m model.load_mtgnn -de 6 -d ../data/GBA -lr 0.01 -e 100 -b 128 -ned 32 -lp results/dc_dsa_gba_sparse.pt
-# python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA_24 -lr 0.001 -e 200 -b 128 -lp results/random_gla.pt
-# python -m model.load_mtgnn_baseline -de 1 -d ../data/ERA5 -lr 0.001 -e 400 -b 128 -lp results/random_era5.pt
+# python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/random_gba_0.pt -s 0
+# python -m model.load_mtgnn_baseline -de 0 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 3
+# python -m model.load_mtgnn_baseline -de 4 -d ../data/ERA5 -lr 1e-3 -e 100 -b 128 -lp results/random_era5_0.pt -s 0
+# python -m model.load_mtgnn_baseline -de 0 -d ../data/CA -lr 1e-2 -e 100 -b 128 -lp results/random_ca_0.pt -s 0
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

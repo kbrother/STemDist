@@ -12,7 +12,7 @@ import math
 import sys
 import copy
 
-# python -m model.train_mtgnn -de 4 -d ../data/GBA_24 -sp results/mtgnn_gba -b 128 -lr 1e-3 
+# python -m model.train_mtgnn -de 0 -d ../data/GBA -sp results/mtgnn_gba_1e-2 -b 64 -lr 1e-2
 # python -m model.train_mtgnn -de 5 -d ../data/ERA5_24 -sp results/mtgnn_era5 -b 32 -lr 1e-3
 # python -m model.train_mtgnn -de 7 -d ../data/GLA_24 -sp results/mtgnn_gla.pt -b 128 -lr 1e-3
 # python -m model.train_mtgnn -de 5 -d ../data/AURORA -sp results/mtgnn_aurora.pt -b 32 -lr 1e-3
@@ -25,7 +25,6 @@ if __name__ == "__main__":
     parser.add_argument('-sp', '--save_path', type=str, default='results/METR-LA-1e-2', help='data path')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
-    parser.add_argument('-us', '--use_static_feat', action='store_true', help='true if using node embedding model')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     args = parser.parse_args()
@@ -51,7 +50,7 @@ if __name__ == "__main__":
         out_dim = 1
 
     model = gtnet(True, True, 2, num_nodes, 
-                  device, predefined_A=None, use_static_feat=args.use_static_feat,
+                  device, predefined_A=None, use_static_feat=False,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
@@ -71,8 +70,6 @@ if __name__ == "__main__":
         model.train()        
         dataloader['train_loader'].shuffle()           
         for it, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())): 
-            if args.use_static_feat:
-                model.embed_forward(xx)
             trainx = torch.tensor(x, device=device, dtype=torch.float)                
             trainx = trainx.transpose(1, 3)
             trainy = torch.tensor(y, device=device, dtype=torch.float)          
@@ -86,16 +83,9 @@ if __name__ == "__main__":
             _optimizer.step()
 
         model.eval()        
-        with torch.no_grad():     
-            if args.use_static_feat:
-                model.embed_forward(xx)            
+        with torch.no_grad():              
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
             test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
             print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
             with open(args.save_path + ".txt", "a") as f:
                 f.write(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}\n')
-
-            if min_val_mse > val_mse:
-                min_val_mse = val_mse
-                min_params = copy.deepcopy(model.state_dict())
-                torch.save(min_params, args.save_path + ".pt")

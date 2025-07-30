@@ -42,6 +42,16 @@ class GradMatch:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
         
+        val_sum, test_sum = 0, 0
+        num_iter = 3
+        for i in range(num_iter):
+            min_i, val_loss, test_loss = self.test_syn()
+            print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            val_sum += val_loss
+            test_sum += test_loss
+        with open(args.save_path + ".txt", 'a') as f:
+            f.write(f"initial, min i: {min_i}, val loss: {val_sum/num_iter}, test loss: {test_sum/num_iter}\n")        
+        
         
     def test_syn(self):
         args = self.args
@@ -164,20 +174,26 @@ class GradMatch:
                     optimizer_model.step()
 
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
-            if (i+1) % 5 == 0:                
-                min_i, val_loss, test_loss = self.test_syn()
-                print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            if (i+1) % args.check_freq == 0:                
+                val_sum, test_sum = 0, 0
+                num_iter = 3
+                for j in range(num_iter):
+                    min_i, val_loss, test_loss = self.test_syn()
+                    val_sum += val_loss
+                    test_sum += test_loss
+                    print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
-                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-                if min_val_loss > val_loss:
-                    min_val_loss = val_loss
+                    val_avg = val_sum/num_iter
+                    f.write(f"my epoch: {i}, val loss: {val_avg}, test loss: {test_sum/num_iter}\n")
+                
+                if min_val_loss > val_avg:
+                    min_val_loss = val_avg
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()                    
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
-                  
 
 
-# python -m DC.distill_mtgnn_cluster -de 0 -d ../data/GBA -e 300 -sp results/debug -lrf 1e-3 -lrs 1e-2 -srr 1e-1 -nrr 0.1 -b 128
+# python -m DC.distill_mtgnn_orig -de 0 -d ../data/GBA -e 100 -sp results/dc_gba_1e-3_1e-2 -lrf 1e-3 -lrs 1e-2 -rr 5e-3 -b 64 -s 0
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
@@ -190,7 +206,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
-    
+    parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
     args = parser.parse_args()
     
     # random seed setting
