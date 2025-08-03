@@ -61,10 +61,8 @@ class DistMatch(DataDistill):
                 _model = _model.to(device)
                     
                 trainx = torch.tensor(x, device=device, dtype=torch.float)                
-                trainx = trainx.transpose(1, 3)
-                trainy = torch.tensor(y, device=device, dtype=torch.float)          
+                trainx = trainx.transpose(1, 3)       
                 output_real = _model(trainx).squeeze()
-                output_real = scaler.inverse_transform(output_real)
                 output_real = torch.mean(output_real, dim=0)
 
                 output_syn = _model(synx.transpose(1, 3)).squeeze()
@@ -76,21 +74,26 @@ class DistMatch(DataDistill):
                 optimizer.step()
 
             self.syny = self.trained_model(synx.transpose(1, 3)).squeeze()
-            if (i + 1)%args.check == 0:
-                min_i, val_loss, test_loss = self.test_syn()
-                print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            if (i+1) % args.check_freq == 0:                
+                val_sum, test_sum = 0, 0
+                num_iter = 3
+                for j in range(num_iter):
+                    min_i, val_loss, test_loss = self.test_syn()
+                    val_sum += val_loss
+                    test_sum += test_loss
+                    print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
-                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
-                if min_val_loss > val_loss:
-                    min_val_loss = val_loss
-                    synx_ = synx.detach().clone().cpu()
+                    val_avg = val_sum/num_iter
+                    f.write(f"my epoch: {i}, val loss: {val_avg}, test loss: {test_sum/num_iter}\n")
+                
+                if min_val_loss > val_avg:
+                    min_val_loss = val_avg
+                    synx_ = self.synx.detach().clone().cpu()
                     syny_ = self.syny.detach().clone().cpu()                    
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
 
 
-# python -m DM.distill_mtgnn_orig -de 7 -d ../data/GBA -e 300 -sp results/dm_gba -lrf 1e-2 -lrs 1e-3 -rr 1e-2 -b 32 -lp results/mtgnn_gba.pt
-# python -m DM.distill_mtgnn_orig -de 7 -d ../data/GBA -e 300 -sp results/dm_gba -lrf 1e-2 -lrs 1e-3 -rr 1e-2 -b 32 -lp results/mtgnn_gba.pt
-# python -m DM.distill_mtgnn_orig -de 7 -d ../data/GBA -e 300 -sp results/dm_gba -lrf 1e-2 -lrs 1e-3 -rr 1e-2 -b 32 -lp results/mtgnn_gba.pt
+# python -m DM.distill_mtgnn_orig -de 0 -d ../data/GBA -e 100 -sp results/dm_gba_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -rr 5e-3 -b 128 -lp results/gba_0.pt
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()

@@ -27,6 +27,8 @@ if __name__ == "__main__":
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-sa', '--save', action='store_true')
+    
     args = parser.parse_args()
     
     # random seed setting
@@ -59,12 +61,6 @@ if __name__ == "__main__":
     #model.reset_parameters()
 
     _optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    min_loss = sys.float_info.max
-
-    xx = np.mean(dataloader['train_loader'].xs_orig, axis=0)
-    xx = np.transpose(xx, (1, 0, 2))   # num_nodes x 12
-    xx = torch.tensor(xx, dtype=torch.float, device=device)    
-    xx = torch.reshape(xx, (num_nodes, -1))
     min_val_mse = sys.float_info.max
     for i in range(args.epochs):
         model.train()        
@@ -85,7 +81,19 @@ if __name__ == "__main__":
         model.eval()        
         with torch.no_grad():              
             val_mse = model.test_model(dataloader['val_loader'], scaler, device)
-            test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
-            print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
-            with open(args.save_path + ".txt", "a") as f:
-                f.write(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}\n')
+            #test_mse = model.test_model(dataloader['test_loader'], scaler, device)    
+            #print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}, test mse: {math.sqrt(test_mse)}')
+            print(f'epoch: {i},  valid mse: {math.sqrt(val_mse)}')
+            if min_val_mse > val_mse:
+                min_val_mse = val_mse
+                min_epoch = i
+                min_params = copy.deepcopy(model.state_dict())
+
+    model.load_state_dict(min_params)
+    model.eval()
+    with torch.no_grad():
+        test_mse = model.test_model(dataloader['test_loader'], scaler, device)   
+    with open(args.save_path + ".txt", "a") as f:
+        f.write(f'epoch: {min_epoch},  valid mse: {math.sqrt(min_val_mse)}, test mse: {math.sqrt(test_mse)}\n')
+    if args.save:
+        torch.save(min_params, args.save_path + ".pt")

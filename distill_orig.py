@@ -41,6 +41,16 @@ class DataDistill:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
+
+        num_iter = 3
+        val_sum, test_sum = 0, 0
+        for i in range(num_iter):
+            min_i, val_loss, test_loss = self.test_syn()
+            print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            val_sum += val_loss
+            test_sum += test_loss
+        with open(args.save_path + ".txt", 'a') as f:
+            f.write(f"initial, min i: {min_i}, val loss: {val_sum/num_iter}, test loss: {test_sum/num_iter}\n")   
         
         
     def test_syn(self):
