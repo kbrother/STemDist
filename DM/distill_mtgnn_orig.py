@@ -74,7 +74,7 @@ class DistMatch(DataDistill):
                 optimizer.step()
 
             self.syny = self.trained_model(synx.transpose(1, 3)).squeeze()
-            if (i+1) % args.check_freq == 0:                
+            if (i+1) % args.check == 0:                
                 val_sum, test_sum = 0, 0
                 num_iter = 3
                 for j in range(num_iter):
@@ -93,7 +93,7 @@ class DistMatch(DataDistill):
                     torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
 
 
-# python -m DM.distill_mtgnn_orig -de 0 -d ../data/GBA -e 100 -sp results/dm_gba_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -rr 5e-3 -b 128 -lp results/gba_0.pt
+# python -m DM.distill_mtgnn_orig -de 0 -d ../data/GBA -e 100 -sp results/dm_gba_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -rr 5e-3 -b 128 -lp results/gba_0.pt -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
