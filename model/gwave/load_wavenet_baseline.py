@@ -25,7 +25,7 @@ def test_gwnet(args, data, synx, syny, device):
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-    for i in tqdm(range(300)):
+    for i in tqdm(range(args.epochs)):
         _model.train()
         output_syn = _model(synx.transpose(1,3)).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
@@ -52,7 +52,7 @@ def test_gwnet(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.gwave.load_wavenet_coreset -de 0 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt
+# python -m model.gwave.load_wavenet_baseline -de 0 -d ../data/GBA -lrs 1e-3 -lp results/dc_gba_1e-2_1e-3.pt -e 400 -s 0
 # python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/GLA -lrs 1e-2 -lp results/random_gla.pt
 # python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/random_era5.pt
 if __name__ == "__main__":
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
+    parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     args = parser.parse_args()
 
     # random seed setting
