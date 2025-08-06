@@ -58,6 +58,7 @@ def test_syn(args, data, synx, syny, device):
 
 
 # python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/random_gba_0.pt -s 0
+# python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 0
 # python -m model.load_mtgnn_baseline -de 0 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 3
 # python -m model.load_mtgnn_baseline -de 4 -d ../data/ERA5 -lr 1e-3 -e 100 -b 128 -lp results/random_era5_0.pt -s 0
 # python -m model.load_mtgnn_baseline -de 0 -d ../data/CA -lr 1e-2 -e 100 -b 128 -lp results/random_ca_0.pt -s 0
@@ -85,8 +86,11 @@ if __name__ == "__main__":
     raw_data = torch.load(args.load_path)
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
+    
+    if (len(synx.shape) <=3):
+        synx = synx.unsqueeze(-1)
+        
     print("load finish")
     print(synx.shape)
     print(syny.shape)
-
     test_syn(args, dataloader, synx, syny, device)

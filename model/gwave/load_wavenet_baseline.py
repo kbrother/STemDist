@@ -52,7 +52,7 @@ def test_gwnet(args, data, synx, syny, device):
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.gwave.load_wavenet_baseline -de 0 -d ../data/GBA -lrs 1e-3 -lp results/dc_gba_1e-2_1e-3.pt -e 400 -s 0
+# python -m model.gwave.load_wavenet_baseline -de 0 -d ../data/GBA -lrs 1e-2 -lp results/random_gba_0.pt -e 400 -s 0
 # python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/GLA -lrs 1e-2 -lp results/random_gla.pt
 # python -m model.gwave.load_wavenet_baseline -de 7 -d ../data/ERA5 -lrs 1e-3 -lp results/random_era5.pt
 if __name__ == "__main__":
@@ -81,6 +81,8 @@ if __name__ == "__main__":
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
 
+    if (len(synx.shape) <=3):
+        synx = synx.unsqueeze(-1)
     print(synx.shape)
     print(syny.shape)
 

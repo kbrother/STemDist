@@ -11,9 +11,10 @@ import math
 from scipy.io import loadmat
 import sys
 import numpy as np
+import copy
 
 
-# python -m model.gwave.train_wavenet -de 7 -d ../data/GBA -lr 1e-2 -e 100 -sp results/real_gwave_gba.txt -b 32
+# python -m model.gwave.train_wavenet -de 0 -d ../data/GBA -lr 1e-2 -e 100 -sp results/real_gba_1e-2.txt -b 64 -s 0
 # python -m model.gwave.train_wavenet -de 5 -d ../data/GLA -lr 1e-3 -e 100 -sp results/real_gwave_gla.txt -b 32
 # python -m model.gwave.train_wavenet -de 5 -d ../data/ERA5 -lr 1e-3 -e 100 -sp results/real_gwave_era5.txt -b 32
 if __name__ == "__main__":
@@ -21,7 +22,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-de', '--device', type=int, default=0, help='')
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA-Tensor', help='data path')
-    parser.add_argument('-sl', '--seq_length', type=int, default=12, help='')
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     parser.add_argument('-lr', '--learning_rate',type=float,default=1e-3,help='learning rate')
@@ -44,7 +44,8 @@ if __name__ == "__main__":
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
-    model = gwnet(device, num_nodes, args.dropout, in_dim, args.seq_length, residual_channels=args.nhid,                   
+    seq_len = dataloader['train_loader'].xs.shape[1]
+    model = gwnet(device, num_nodes, args.dropout, in_dim, seq_len, residual_channels=args.nhid,                   
                   dilation_channels=args.nhid, skip_channels=8*args.nhid, end_channels=16*args.nhid)
     model.to(device)
     #model.reset_parameters()
@@ -70,9 +71,18 @@ if __name__ == "__main__":
 
         model.eval()
         with torch.no_grad():               
-            val_mae = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
-            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+            val_mse = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
+            #test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
+            print(f'epoch: {i}, valid mse: {val_mse}')
 
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
+            if min_val_mse > val_mse:
+                min_val_mse = val_mse
+                min_params = copy.deepcopy(model.state_dict())
+
+    model.load_state_dict(min_params)
+    with torch.no_grad():
+        test_mse = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
+    with open(args.save_path, "a") as f:
+        f.write(f'epoch: {i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')
+
+        
