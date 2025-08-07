@@ -50,6 +50,8 @@ def test_gwnet(args, data, synx, syny, device):
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 
 # python -m model.gwave.load_wavenet_baseline -de 0 -d ../data/GBA -lrs 1e-2 -lp results/random_gba_0.pt -e 400 -s 0
@@ -67,6 +69,7 @@ if __name__ == "__main__":
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
     parser.add_argument('-dr', '--dropout',type=float,default=0.3,help='dropout rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     args = parser.parse_args()
 
     # random seed setting
