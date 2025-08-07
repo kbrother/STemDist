@@ -15,7 +15,8 @@ import math
 def test_gwnet(args, data, synx, syny, device):
 
     num_nodes = data['train_loader'].xs.shape[2]
-    in_dim = data['train_loader'].xs.shape[3]
+    #in_dim = data['train_loader'].xs.shape[3]
+    in_dim= synx.shape[3]
     scaler = data['scaler']
     seq_len = data['train_loader'].xs.shape[1]
     _model =  gwnet(device, num_nodes, args.dropout, in_dim, seq_len, residual_channels=args.nhid, 
@@ -34,7 +35,7 @@ def test_gwnet(args, data, synx, syny, device):
         optimizer.step()
 
         _model.eval()
-        if (i+1)%10 == 0:
+        if (i+1)%5 == 0:
             with torch.no_grad():
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
