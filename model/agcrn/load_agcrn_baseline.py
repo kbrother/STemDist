@@ -15,7 +15,7 @@ import copy
 def test_syn(args, data, synx, syny, device):    
     scaler = dataloader['scaler']
     num_nodes = dataloader['train_loader'].xs.shape[2]
-    in_dim = dataloader['train_loader'].xs.shape[3]    
+    in_dim = synx.shape[3]    
     _model = AGCRN(args, num_nodes, in_dim)
     optimizer = torch.optim.Adam(params=_model.parameters(), lr=args.lr)
     _model = _model.to(device)
@@ -49,7 +49,10 @@ def test_syn(args, data, synx, syny, device):
     _model.eval()
     with torch.no_grad():        
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+    
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")       
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 
 # python -m model.agcrn.load_agcrn_coreset -de 7 -d ../data/GBA -lr 0.01 -e 100 -b 32 -rr 0.01 -lp results/random_gba.pt
@@ -60,12 +63,12 @@ if __name__ == '__main__':
     args.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     args.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     args.add_argument('-r', '--rnn_units', type=int, default=2**6, help='rnn hidden unit')
-    args.add_argument('-ed', '--embed_dim', default=10, type=int)
     args.add_argument('-nl', '--num_layers', default=2, type=int)
     args.add_argument('-lr', '--lr', default=0.003, type=float)
     args.add_argument('-e', '--epochs', default=100, type=int)
     args.add_argument('-s', '--seed', type=int, default=0, help='')
     args.add_argument('-lp', '--load_path', type=str, default='results/') 
+    args.add_argument('-sp', '--save_path', type=str, default='results/')
     args = args.parse_args()
 
     # random seed setting
@@ -80,6 +83,10 @@ if __name__ == '__main__':
     raw_data = torch.load(args.load_path)
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
+
+    if (len(synx.shape) <=3):
+        synx = synx.unsqueeze(-1)
+        
     print("load finish")
     print(synx.shape)
     print(syny.shape)

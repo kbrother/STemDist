@@ -107,13 +107,14 @@ class AGCRN(nn.Module):
         self.output_dim = 1
         self.horizon = 12
         self.num_layers = args.num_layers
-
+        self.embed_dim = 10
+        
         if use_model:
-            self.model = NodeEmbedding_attn(self.horizon*input_dim, ne_dim, args.embed_dim)
+            self.model = NodeEmbedding_attn(self.horizon*input_dim, ne_dim, self.embed_dim)
         else:
-            self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, args.embed_dim), requires_grad=True)
+            self.node_embeddings = nn.Parameter(torch.randn(self.num_nodes, self.embed_dim), requires_grad=True)
         self.encoder = AVWDCRNN(self.num_nodes, input_dim, args.rnn_units, 2,
-                                args.embed_dim, args.num_layers)
+                                self.embed_dim, args.num_layers)
 
         #predictor
         self.end_conv = nn.Conv2d(1, self.horizon * self.output_dim, kernel_size=(1, self.hidden_dim), bias=True)
@@ -156,6 +157,7 @@ class AGCRN(nn.Module):
             
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
+            valx = valx[:,:,:,:self.input_dim]
             valy = torch.tensor(y, device=device, dtype=torch.float)
             output = self.forward(valx).squeeze()            
             output = scaler.inverse_transform(output)
