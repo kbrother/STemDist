@@ -9,7 +9,7 @@ import torch
 import numpy as np
 import sys
 import math
-
+import copy
 
 # python -m model.agcrn.train_agcrn -de 6 -d ../data/GBA -lr 0.01 -e 100 -sp results/real_agcrn_gba.txt
 # python -m model.agcrn.train_agcrn -de 5 -d ../data/GLA -lr 0.01 -e 100 -sp results/real_agcrn_gla.txt -b 32
@@ -23,7 +23,6 @@ if __name__ == "__main__":
     args.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     args.add_argument('-r', '--rnn_units', type=int, default=2**6, help='rnn hidden unit')
     args.add_argument('-nl', '--num_layers', default=2, type=int)
-    args.add_argument('-ed', '--embed_dim', default=10, type=int)
     args.add_argument('-lr', '--lr', default=0.003, type=float)
     args.add_argument('-e', '--epochs', default=100, type=int)
     args.add_argument('-s', '--seed', type=int, default=0, help='')
@@ -63,9 +62,7 @@ if __name__ == "__main__":
         for iter, (x, y) in enumerate(tqdm(dataloader['train_loader'].get_iterator())):
             trainx = torch.tensor(x, device=device, dtype=torch.float)
             trainy = torch.tensor(y, device=device, dtype=torch.float)            
-            print(trainx.shape)
             output = model(trainx)
-            #print(output)
             output = scaler.inverse_transform(output).squeeze()
             curr_loss, num_val_entry = util.masked_se(output, trainy, 0.)            
             curr_loss /= num_val_entry
@@ -76,9 +73,16 @@ if __name__ == "__main__":
 
         model.eval()
         with torch.no_grad():               
-            val_mae = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device)          )  
-            print(f'epoch: {e}, valid mae: {val_mae}, test mae: {test_mae}')
+            val_mse = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
+            #test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device)          )  
+            print(f'epoch: {e}, valid mae: {val_mse}')
+            if min_val_mse > val_mse:
+                min_val_mse = val_mse
+                min_param = copy.deepcopy(model.state_dict())
 
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {e}, valid mae: {val_mae}, test mae: {test_mae}\n')
+    
+    model.load_state_dict(min_params)
+    with torch.no_grad():
+        test_mse = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
+    with open(args.save_path, "a") as f:
+        f.write(f'epoch: {i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')
