@@ -11,6 +11,7 @@ import math
 from scipy.io import loadmat
 import sys
 import numpy as np
+import copy
 
 
 # python -m model.stgcn.train_stgcn -de 6 -d ../data/GBA -lr 1e-2 -e 100 -sp results/real_stgcn_gba.txt
@@ -68,13 +69,12 @@ if __name__ == "__main__":
         with torch.no_grad():               
             val_mse = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
             #test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))            
-            print(f'epoch: {i}, valid mae: {val_mae}')
+            print(f'epoch: {i}, valid mae: {val_mse}')
             if min_val_mse > val_mse:
                 min_val_mse = val_mse
-                min_params = copy.deepcopy(model.state_dict())
+                min_params = copy.deepcopy(_model.state_dict())
 
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
+            print(f'epoch: {i}, valid mae: {val_mse}\n')
 
     model.load_state_dict(min_params)
     with torch.no_grad():
