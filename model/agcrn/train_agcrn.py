@@ -78,7 +78,7 @@ if __name__ == "__main__":
             print(f'epoch: {e}, valid mae: {val_mse}')
             if min_val_mse > val_mse:
                 min_val_mse = val_mse
-                min_param = copy.deepcopy(model.state_dict())
+                min_params = copy.deepcopy(model.state_dict())
 
     
     model.load_state_dict(min_params)

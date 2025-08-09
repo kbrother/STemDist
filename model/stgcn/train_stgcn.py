@@ -72,7 +72,7 @@ if __name__ == "__main__":
             print(f'epoch: {i}, valid mae: {val_mae}')
             if min_val_mse > val_mse:
                 min_val_mse = val_mse
-                min_param = copy.deepcopy(model.state_dict())
+                min_params = copy.deepcopy(model.state_dict())
 
             with open(args.save_path, "a") as f:
                 f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
