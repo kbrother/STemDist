@@ -52,7 +52,6 @@ if __name__ == "__main__":
         _model.train()        
         dataloader['train_loader'].shuffle()
         for iter, (x, y) in enumerate(dataloader['train_loader'].get_iterator()):
-            _model.embed_forward(nm_input_real)
             trainx = torch.tensor(x, device=device, dtype=torch.float)
             trainx = trainx.transpose(1, 2)
             trainy = torch.tensor(y, device=device, dtype=torch.float)
