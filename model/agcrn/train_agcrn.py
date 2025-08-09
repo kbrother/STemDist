@@ -77,6 +77,7 @@ if __name__ == "__main__":
             #test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device)          )  
             print(f'epoch: {e}, valid mae: {val_mse}')
             if min_val_mse > val_mse:
+                min_i = e
                 min_val_mse = val_mse
                 min_params = copy.deepcopy(model.state_dict())
 
@@ -85,4 +86,4 @@ if __name__ == "__main__":
     with torch.no_grad():
         test_mse = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
     with open(args.save_path, "a") as f:
-        f.write(f'epoch: {i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')
+        f.write(f'epoch: {min_i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')
