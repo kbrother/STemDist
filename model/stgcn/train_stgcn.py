@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
         _model.eval()
         with torch.no_grad():               
-            val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
+            val_mse = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
             #test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))            
             print(f'epoch: {i}, valid mae: {val_mae}')
             if min_val_mse > val_mse:
