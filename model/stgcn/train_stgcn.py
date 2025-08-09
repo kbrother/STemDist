@@ -42,17 +42,12 @@ if __name__ == "__main__":
     num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]
     seq_len = dataloader['train_loader'].xs.shape[1]
-    _model = STGCN(in_dim, seq_len, seq_len, 128)
+    _model = STGCN(in_dim, seq_len, seq_len, num_nodes, False)
     #model.reset_parameters()
 
     _model.to(device)
     _optimizer = optim.Adam(_model.parameters(), lr=args.lr)
-    min_val_mse = sys.float_info.max
-    
-    nm_input_real = np.mean(dataloader['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
-    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
-    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim    
+    min_val_mse = sys.float_info.max    
     for i in range(args.epochs):
         _model.train()        
         dataloader['train_loader'].shuffle()
@@ -73,8 +68,17 @@ if __name__ == "__main__":
         _model.eval()
         with torch.no_grad():               
             val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))            
-            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+            #test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))            
+            print(f'epoch: {i}, valid mae: {val_mae}')
+            if min_val_mse > val_mse:
+                min_val_mse = val_mse
+                min_param = copy.deepcopy(model.state_dict())
 
             with open(args.save_path, "a") as f:
                 f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
+
+    model.load_state_dict(min_params)
+    with torch.no_grad():
+        test_mse = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
+    with open(args.save_path, "a") as f:
+        f.write(f'epoch: {i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')

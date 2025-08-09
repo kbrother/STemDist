@@ -99,7 +99,7 @@ class STGCN(nn.Module):
     """
 
     def __init__(self, num_features, num_timesteps_input,
-                 num_timesteps_output, ne_dim=32):
+                 num_timesteps_output, num_nodes, use_model=False, ne_dim=32):
         """
         :param num_nodes: Number of nodes in the graph.
         :param num_features: Number of features at each node in each time step.
@@ -117,11 +117,13 @@ class STGCN(nn.Module):
         self.fully = nn.Linear((num_timesteps_input - 2 * 5) * 64,
                                num_timesteps_output)
 
-        self.model1 = NodeEmbedding_attn(num_timesteps_input*num_features, ne_dim, 10)
-        self.model2 = NodeEmbedding_attn(num_timesteps_input*num_features, ne_dim, 10)
-
-        self.node_lin1 = nn.Linear(10, 10)
-        self.node_lin2 = nn.Linear(10, 10)
+        self.num_feats = num_features
+        if use_model:
+            self.model1 = NodeEmbedding_attn(num_timesteps_input*num_features, ne_dim, 10)
+            self.model2 = NodeEmbedding_attn(num_timesteps_input*num_features, ne_dim, 10)
+        else:
+            self.nodevec1 = nn.Parameter(torch.randn(num_nodes, 10), requires_grad=True)
+            self.nodevec2 = nn.Parameter(torch.randn(num_nodes, 10), requires_grad=True)
 
     
     def embed_forward(self, _input):
@@ -167,6 +169,7 @@ class STGCN(nn.Module):
             
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
+            valx = valx[:,:,:,:self.num_feats]
             valx = valx.transpose(1, 2)
             valy = torch.tensor(y, device=device, dtype=torch.float)
             output = self.forward(valx).squeeze()            

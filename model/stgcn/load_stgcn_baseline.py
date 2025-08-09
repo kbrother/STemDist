@@ -15,29 +15,18 @@ import math
 def test_stgcn(args, data, synx, syny, device):
 
     num_nodes = data['train_loader'].xs.shape[2]
-    in_dim = data['train_loader'].xs.shape[3]
+    in_dim = synx.shape[3]
     scaler = data['scaler']
     seq_len = data['train_loader'].xs.shape[1]
-    _model = STGCN(in_dim, seq_len, seq_len, 128)
+    _model = STGCN(in_dim, seq_len, seq_len, num_nodes, False)
     
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
-
-    nm_input_real = np.mean(data['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
-    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
-    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
-     
-    nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
-    nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
-    nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
-
     synx = torch.transpose(synx, 1, 2)
     syny = torch.transpose(syny, 1, 2)
     for i in tqdm(range(args.epochs)):
         _model.train()
-        _model.embed_forward(nm_input_syn)
         output_syn = _model(synx)
         loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
@@ -46,8 +35,7 @@ def test_stgcn(args, data, synx, syny, device):
 
         _model.eval()
         if (i+1)%10 == 0:
-            with torch.no_grad():
-                _model.embed_forward(nm_input_real)
+            with torch.no_grad():                
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
             print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
@@ -59,9 +47,11 @@ def test_stgcn(args, data, synx, syny, device):
     _model.load_state_dict(min_params)
     _model.eval()
     with torch.no_grad():
-        _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+    
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")       
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")  
 
 
 # python -m model.stgcn.load_stgcn -de 7 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt -e 300
@@ -77,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
     parser.add_argument('-e', '--epochs', default=100, type=int)
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     args = parser.parse_args()
 
     # random seed setting
@@ -91,6 +82,8 @@ if __name__ == "__main__":
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
 
+    if (len(synx.shape) <=3):
+        synx = synx.unsqueeze(-1)
     print(synx.shape)
     print(syny.shape)
 
