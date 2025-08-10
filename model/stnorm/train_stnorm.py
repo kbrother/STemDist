@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 min_params = copy.deepcopy(_model.state_dict())
 
     
-    model.load_state_dict(min_params)
+    _model.load_state_dict(min_params)
     with torch.no_grad():
         test_mse = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))
     with open(args.save_path, "a") as f:
