@@ -11,6 +11,7 @@ import math
 from scipy.io import loadmat
 import sys
 import numpy as np
+import copy
 
 
 # python -m model.stnorm.train_stnorm -de 5 -d ../data/GBA -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_gba.txt
