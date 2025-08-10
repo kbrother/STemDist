@@ -65,10 +65,19 @@ if __name__ == "__main__":
             curr_loss.backward()
             _optimizer.step()
 
-        _model.eval()
+        model.eval()
         with torch.no_grad():               
-            val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device)            )
-            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
+            val_mse = math.sqrt(model.test_model(dataloader['val_loader'], scaler, device))
+            #test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device)          )  
+            print(f'epoch: {e}, valid mae: {val_mse}')
+            if min_val_mse > val_mse:
+                min_i = e
+                min_val_mse = val_mse
+                min_params = copy.deepcopy(model.state_dict())
+
+    
+    model.load_state_dict(min_params)
+    with torch.no_grad():
+        test_mse = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device))
+    with open(args.save_path, "a") as f:
+        f.write(f'epoch: {min_i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')

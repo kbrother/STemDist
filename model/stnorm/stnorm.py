@@ -73,6 +73,7 @@ class STNorm(nn.Module):
         self.gconv = nn.ModuleList()
         self.cross_product = nn.ModuleList()
 
+        self.in_dim = in_dim
         self.start_conv = nn.Conv2d(in_channels=in_dim,
                                     out_channels=channels,
                                     kernel_size=(1,1))
@@ -204,6 +205,7 @@ class STNorm(nn.Module):
             
         for iter, (x, y) in enumerate(dataloader.get_iterator()):
             valx = torch.tensor(x, device=device, dtype=torch.float)
+            valx = valx[:,:,:,:self.in_dim]
             valy = torch.tensor(y, device=device, dtype=torch.float)
             output = self.forward(valx).squeeze()            
             output = scaler.inverse_transform(output)

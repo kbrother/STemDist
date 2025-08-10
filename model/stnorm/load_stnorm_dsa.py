@@ -12,7 +12,10 @@ import copy
 import math
 
 
-def test_stnorm(args, data, synx, syny, device):
+def test_stnorm(args, data, raw_data, device):
+    synx = raw_data['x'].to(device)
+    syny = raw_data['y'].to(device)
+    _weight = raw_data['w'].to(device)
 
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
@@ -23,13 +26,25 @@ def test_stnorm(args, data, synx, syny, device):
     _model.to(device)
     optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
     min_val_loss = sys.float_info.max
+    num_sample = round(synx.shape[2]/4)
     for i in tqdm(range(args.epochs)):
         _model.train()
-        output_syn = _model(synx).squeeze()
-        loss_syn = F.mse_loss(output_syn, syny)
-        optimizer.zero_grad()
-        loss_syn.backward()
-        optimizer.step()
+        _order = list(range(synx.shape[2]))
+        random.shuffle(_order)
+
+        for j in range(4):
+            if j < 3:
+                _idx = _order[num_sample*j:num_sample*(j+1)]
+            else:
+                _idx = _order[num_sample*j:]     
+            curr_weight = _weight[:,:,_idx] / torch.sum(_weight[:,:,_idx]) * num_sample
+            
+            output_syn = _model(synx[:,:,_idx,:]).squeeze()
+            loss_syn = torch.square(output_syn - syny[:,:,_idx]) * curr_weight
+            loss_syn = torch.mean(loss_syn)
+            optimizer.zero_grad()
+            loss_syn.backward()
+            optimizer.step()
 
         _model.eval()
         if (i+1)%10 == 0:
@@ -48,7 +63,9 @@ def test_stnorm(args, data, synx, syny, device):
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
-
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
+        
 
 # python -m model.stnorm.load_stnorm -de 5 -d ../data/GBA -lrs 1e-3 -lp results/dc_clus_gba.pt -b 32
 # python -m model.stnorm.load_stnorm -de 5 -d ../data/GBA -lrs 1e-3 -lp results/random_gba.pt -b 32
@@ -76,10 +93,5 @@ if __name__ == "__main__":
     device = torch.device(f"cuda:{args.device}")
     dataloader = util.load_dataset(args.data, args.batch_size)
     raw_data = torch.load(args.load_path)
-    synx = raw_data['x'].to(device)
-    syny = raw_data['y'].to(device)
 
-    print(synx.shape)
-    print(syny.shape)
-
-    test_stnorm(args, dataloader, synx, syny, device)
+    test_stnorm(args, dataloader, raw_data, device)
