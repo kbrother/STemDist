@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
     parser.add_argument('-nh', '--nhid', type=int, default=32, help='')
-    args.add_argument('-sp', '--save_path', type=str, default='results/')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     args = parser.parse_args()
 
     # random seed setting
