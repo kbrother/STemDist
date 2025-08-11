@@ -24,7 +24,8 @@ def test_fgnn(args, data, synx, syny, device):
     _model = _model.to(device)
 
     min_val_loss = sys.float_info.max
-    synx = synx[:,:,:,0]
+    if len(synx.shape) > 3:
+        synx = synx[:,:,:,0]
     for i in tqdm(range(args.epochs)):
         _model.train()
         output_syn = _model(synx).squeeze()
