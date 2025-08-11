@@ -28,7 +28,7 @@ def test_fgnn(args, data, synx, syny, device):
     for i in tqdm(range(args.epochs)):
         _model.train()
         output_syn = _model(synx).squeeze()
-        output_syn = torch.transpose(output_syn, 2, 1)
+        output_syn = torch.transpose(output_syn, 1, 2)
         loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
         loss_syn.backward()
@@ -51,7 +51,8 @@ def test_fgnn(args, data, synx, syny, device):
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
 
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
-
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 # python -m model.fgnn.load_fgnn -de 5 -d ../data/GBA -lr 1e-2 -e 300 -lp results/random_gba.pt -b 32
 # python -m model.fgnn.load_fgnn -de 7 -d ../data/GLA -lr 1e-2 -e 500 -lp results/random_gla.pt -b 32
@@ -67,6 +68,7 @@ if __name__ == "__main__":
     args.add_argument('-s', '--seed', type=int, default=0, help='')
     args.add_argument('--embed_size', type=int, default=128, help='hidden dimensions')
     args.add_argument('--hidden_size', type=int, default=256, help='hidden dimensions')
+    args.add_argument('-sp', '--save_path', type=str, default='results/')
     args = args.parse_args()    
 
     # random seed setting

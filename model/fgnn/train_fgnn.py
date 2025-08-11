@@ -11,6 +11,7 @@ import math
 from scipy.io import loadmat
 import sys
 import numpy as np
+import copy
 
 
 # python -m model.fgnn.train_fgnn -de 6 -d ../data/GBA -lr 1e-3 -e 100 -b 32 -sp results/real_stnorm_gba.txt
@@ -69,9 +70,17 @@ if __name__ == "__main__":
 
         _model.eval()
         with torch.no_grad():               
-            val_mae = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
-            test_mae = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device)         )   
-            print(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}')
+            val_mse = math.sqrt(_model.test_model(dataloader['val_loader'], scaler, device))
+            #test_mae = math.sqrt(model.test_model(dataloader['test_loader'], scaler, device)          )  
+            print(f'epoch: {i}, valid mae: {val_mse}')
+            if min_val_mse > val_mse:
+                min_i = i
+                min_val_mse = val_mse
+                min_params = copy.deepcopy(_model.state_dict())
 
-            with open(args.save_path, "a") as f:
-                f.write(f'epoch: {i}, valid mae: {val_mae}, test mae: {test_mae}\n')
+    
+    _model.load_state_dict(min_params)
+    with torch.no_grad():
+        test_mse = math.sqrt(_model.test_model(dataloader['test_loader'], scaler, device))
+    with open(args.save_path, "a") as f:
+        f.write(f'epoch: {min_i}, valid mse: {min_val_mse}, test mse: {test_mse}\n')
