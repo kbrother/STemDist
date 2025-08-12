@@ -45,10 +45,15 @@ class GradMatchCluster:
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
 
-        min_i, val_loss, test_loss = self.test_syn()
-        print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+        val_sum, test_sum = 0, 0
+        num_iter = 3
+        for i in range(num_iter):
+            min_i, val_loss, test_loss = self.test_syn()
+            print(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
+            val_sum += val_loss
+            test_sum += test_loss
         with open(args.save_path + ".txt", 'a') as f:
-            f.write(f"initial, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}\n")
+            f.write(f"initial, min i: {min_i}, val loss: {val_sum/num_iter}, test loss: {test_sum/num_iter}\n")
 
         
     def test_syn(self):
@@ -86,7 +91,7 @@ class GradMatchCluster:
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
 
         _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
-        _weight = _weight / torch.sum(_weight)
+        _weight = _weight / torch.sum(_weight) * self.num_nodes
         _weight = _weight.unsqueeze(0).unsqueeze(0)
         for i in tqdm(range(200)):  
             _model.train()
@@ -141,7 +146,7 @@ class GradMatchCluster:
         nm_input_real = torch.reshape(nm_input_real, (self.num_nodes, -1))   # num_nodes x seq length*in_dim
 
         _weight = torch.tensor(dataloader['train_loader'].label_cnt, device=device)
-        _weight = _weight / torch.sum(_weight)
+        _weight = _weight / torch.sum(_weight) * self.num_nodes
         _weight = _weight.unsqueeze(0).unsqueeze(0)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()
@@ -216,19 +221,20 @@ class GradMatchCluster:
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
             if (i+1) % args.check_freq == 0:                
                 val_sum, test_sum = 0, 0
-                for j in range(5):
+               num_iter = 3
+                for j in range(num_iter):
                     min_i, val_loss, test_loss = self.test_syn()
                     val_sum += val_loss
                     test_sum += test_loss
                     print(f"my epoch: {i}, min i: {min_i}, val loss: {val_loss}, test loss: {test_loss}")
                 with open(args.save_path + ".txt", 'a') as f:
-                    val_avg = val_sum/5
-                    f.write(f"my epoch: {i}, min i: {min_i}, val loss: {val_avg}, test loss: {test_sum/5}\n")
+                    val_avg = val_sum/num_iter
+                    f.write(f"my epoch: {i}, val loss: {val_avg}, test loss: {test_sum/num_iter}\n")
                 if min_val_loss > val_avg:
                     min_val_loss = val_avg
                     synx_ = synx.detach().clone().cpu()
                     syny_ = syny.detach().clone().cpu()                    
-                    torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
+                    torch.save({'x':synx_, 'y':syny_ ,'w': _weight}, args.save_path + ".pt")
                   
 
 # python -m DC.distill_mtgnn_cluster -de 2 -d ../data/GBA -e 100 -sp results/dc_gba_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 0 -c 5
