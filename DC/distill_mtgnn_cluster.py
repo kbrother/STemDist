@@ -221,7 +221,7 @@ class GradMatchCluster:
             print(f"epoch: {i}, grad loss: {grad_loss/num_ol}")
             if (i+1) % args.check_freq == 0:                
                 val_sum, test_sum = 0, 0
-               num_iter = 3
+                num_iter = 3
                 for j in range(num_iter):
                     min_i, val_loss, test_loss = self.test_syn()
                     val_sum += val_loss
@@ -237,7 +237,7 @@ class GradMatchCluster:
                     torch.save({'x':synx_, 'y':syny_ ,'w': _weight}, args.save_path + ".pt")
                   
 
-# python -m DC.distill_mtgnn_cluster -de 2 -d ../data/GBA -e 100 -sp results/dc_gba_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 0 -c 5
+# python -m DC.distill_mtgnn_cluster -de 2 -d ../data/GBA -e 100 -sp results/dc_cluster_gba_1e-3_1e-4_0 -lrf 1e-3 -lrs 1e-4 -srr 0.1 -nrr 0.05 -b 256 -ned 32 -s 0 -c 5
 # python -m DC.distill_mtgnn_cluster -de 3 -d ../data/GLA -e 100 -sp results/dc_gla_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 1 -c 1
 # python -m DC.distill_mtgnn_cluster -de 2 -d ../data/ERA5 -e 100 -sp results/dc_era5_cluster -lrf 1e-3 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 32 -ned 128 -s 0 -c 5
 if __name__ == "__main__":
@@ -251,10 +251,10 @@ if __name__ == "__main__":
     parser.add_argument('-nrr', '--node_reduce_rate',type=float,default=1,help='learning rate')
     parser.add_argument('-srr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
-    parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
+    parser.add_argument('-ned', '--ne_dim',type=int,default=32,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
-    parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
+    parser.add_argument('-c', '--check_freq', type=int, default=5, help='')
     
     args = parser.parse_args()
     
