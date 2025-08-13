@@ -78,7 +78,8 @@ def test_syn(args, data, raw_data, device):
         _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
-
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 # python -m model.load_mtgnn_dsa2 -de 4 -d ../data/GBA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gba_1e-3_1e-3.pt -s 0 -ned 32
 # python -m model.load_mtgnn_dsa2 -de 4 -d ../data/GLA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gla_1e-3_1e-3.pt -s 0 -ned 32
