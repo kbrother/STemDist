@@ -70,7 +70,7 @@ def test_syn(args, data, raw_data, device):
             optimizer.step()
         
         _model.eval()
-        if (i+1)%10 == 0:
+        if (i+1)%args.check == 0:
             with torch.no_grad():
                 _model.embed_forward(nm_input_real)
                 val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
@@ -87,6 +87,8 @@ def test_syn(args, data, raw_data, device):
         _model.embed_forward(nm_input_real)
         test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 
 # python -m model.load_mtgnn_dsa2 -de 4 -d ../data/GBA -lr 0.001 -e 400 -b 128 -lp results/dc_dsa_cluster_gba_1e-3_1e-3.pt -s 0 -ned 32
@@ -103,8 +105,10 @@ if __name__ == "__main__":
     parser.add_argument('-lr', '--lr',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-c', '--check', type=int, default=5, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/')
     parser.add_argument('-ned', '--ne_dim',type=int,default=32,help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     args = parser.parse_args()
 
     # random seed setting
