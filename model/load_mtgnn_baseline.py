@@ -40,10 +40,13 @@ def test_syn(args, data, synx, syny, device):
         optimizer.step()
 
         _model.eval()
-        if (i+1)%5 == 0:
+        if (i+1)%args.check == 0:
             with torch.no_grad():
-                val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
-                #test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+                if args.ae:
+                    val_loss = _model.test_model(data['val_loader'], scaler, device, args.ae)
+                else:
+                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
+
             print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
                 min_i = i
@@ -52,12 +55,17 @@ def test_syn(args, data, synx, syny, device):
 
     _model.load_state_dict(min_params)
     _model.eval()
-    with torch.no_grad():        
-        test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+    with torch.no_grad():       
+        if args.ae:
+            test_loss =_model.test_model(data['test_loader'], scaler, device, args.ae)
+        else:
+            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
+    with open(args.save_path, "a") as f:
+        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 
-# python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/random_gba_0.pt -s 0
+# python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/condtsf_gba_0.pt -s 0 -ae True
 # python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 0
 # python -m model.load_mtgnn_baseline -de 0 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 3
 # python -m model.load_mtgnn_baseline -de 4 -d ../data/ERA5 -lr 1e-3 -e 100 -b 128 -lp results/random_era5_0.pt -s 0
@@ -71,7 +79,9 @@ if __name__ == "__main__":
     parser.add_argument('-lr', '--lr',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
+    parser.add_argument('-c', '--check', type=int, default=5, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
+    parser.add_argument('-ae', '--ae', type=bool, default=False, help='')
     args = parser.parse_args()
 
     # random seed setting
