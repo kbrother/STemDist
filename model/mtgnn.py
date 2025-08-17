@@ -184,7 +184,7 @@ class gtnet(nn.Module):
         self.gc.register_buffer("nodevec2", node_embed2)
 
 
-    def test_model(self, dataloader, scaler, device):
+    def test_model(self, dataloader, scaler, device, ae=False):
         loss_sum, naive_loss_sum = 0, 0
 
         y_mean = 0
@@ -202,7 +202,10 @@ class gtnet(nn.Module):
             valy = torch.tensor(y, device=device, dtype=torch.float)
             output = self.forward(valx).squeeze()            
             output = scaler.inverse_transform(output)
-            curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
+            if ae:
+                curr_loss, curr_naive_loss = util.masked_ae2(output, valy, 0., y_mean)               
+            else:
+                curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
             loss_sum += curr_loss.item()
             naive_loss_sum += curr_naive_loss.item()
         return loss_sum/naive_loss_sum

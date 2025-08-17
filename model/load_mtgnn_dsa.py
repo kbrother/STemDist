@@ -73,7 +73,10 @@ def test_syn(args, data, raw_data, device):
         if (i+1)%args.check == 0:
             with torch.no_grad():
                 _model.embed_forward(nm_input_real)
-                val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
+                if args.ae:
+                    val_loss = _model.test_model(data['val_loader'], scaler, device, args.ae)
+                else:
+                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
             print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
@@ -85,7 +88,10 @@ def test_syn(args, data, raw_data, device):
     _model.eval()
     with torch.no_grad():    
         _model.embed_forward(nm_input_real)
-        test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+        if args.ae:
+            test_loss =_model.test_model(data['test_loader'], scaler, device, args.ae)
+        else:
+            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
     with open(args.save_path, "a") as f:
         f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
@@ -109,6 +115,7 @@ if __name__ == "__main__":
     parser.add_argument('-lp', '--load_path', type=str, default='results/')
     parser.add_argument('-ned', '--ne_dim',type=int,default=32,help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
+    parser.add_argument('-a', '--ae', action='store_true')
     args = parser.parse_args()
 
     # random seed setting
