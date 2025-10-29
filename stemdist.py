@@ -263,10 +263,10 @@ class GradMatchCluster:
                     torch.save({'x':synx_, 'y':syny_ ,'w': _weight}, args.save_path + ".pt")
                   
 
-# python -m DC.distill_mtgnn_cluster_dsa_4 -de 2 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 1 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa_4 -de 3 -d ../data/GLA -e 100 -sp results/dc_dsa_cluster_gla_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 2 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa_4 -de 1 -d ../data/ERA5 -e 100 -sp results/dc_dsa_cluster_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
-# python -m DC.distill_mtgnn_cluster_dsa_4 -de 1 -d ../data/AURORA -e 100 -sp results/dc_dsa_cluster_aurora_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 1 -c 5
+# python -m stemdist -de 2 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 1 -c 5
+# python -m stemdist -de 3 -d ../data/GLA -e 100 -sp results/dc_dsa_cluster_gla_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 128 -ned 32 -s 2 -c 5
+# python -m stemdist -de 1 -d ../data/ERA5 -e 100 -sp results/dc_dsa_cluster_era5_1e-2 -lrf 1e-2 -lrs 1e-2 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 0 -c 5
+# python -m stemdist -de 1 -d ../data/AURORA -e 100 -sp results/dc_dsa_cluster_aurora_1e-2_1e-3 -lrf 1e-2 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 64 -ned 32 -s 1 -c 5
 if __name__ == "__main__":
     torch.set_num_threads(4)
     parser = argparse.ArgumentParser()
