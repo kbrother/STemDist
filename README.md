@@ -38,12 +38,12 @@ The distillation process of STemDist is implemented in `stemdist.py`.
 
 ### Example command
 ```
-  python -m stemdist -de 0 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 0 -c 5
+  python -m stemdist -de 0 -d ../data/GBA -e 100 -sp results/stemdist_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 0 -c 5
 ```
 
 ### Example output
-* `dc_dsa_cluster_gba_1e-3_1e-3.pt`: Saves the distilled dataset.
-* `dc_dsa_cluster_gba_1e-3_1e-3.txt`: Saves the performance of distilled datasets for every 'check_freq' outer iteration.
+* `stemdist_gba_1e-3_1e-3.pt`: Saves the distilled dataset.
+* `stemdist_gba_1e-3_1e-3.txt`: Saves the performance of distilled datasets for every 'check_freq' outer iteration.
 
 
 ## Checking the performance of the distilled dataset
