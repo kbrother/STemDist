@@ -19,3 +19,17 @@ Please download and check the datasets below for more details.
 
 * There are three npz files (`train.npz, val.npz, test.npz`) per dataset.
 * Each file contains two arrays, `x` and `y`. `x` is an array of input time series, and `y` is an array of target time series.
+
+## Running STemDist
+The distillation process of STemDist is implemented in `stemdist.py`.
+### Positional arguments
+* `-de`, `--device`: GPU id for execution.
+* `-d`, `--data`: Location of the dataset folder.
+* `-b`, `--batch_size`: Batch size for the distillation process.
+* `-lrs`, `--lr_syn`: Learning rate for the surrogate model, which is trained on the synthetic dataset.
+* `-lrf`, `--lr_feat`: Learning rate for the synthetic dataset.
+* `-nrr`, `--node_reduce_rate`: Compression ratio for the spatial dimension.
+* `-srr`, `--sereis_reduce_rate`: Compression ratio for the temporal dimension.
+* `-e`, `--epoch`: Number of outer iterations.
+* `-ned`, `--ne_dim`: Hidden dimension in the location embedding model.
+* `-s`, `--seed`: Seed of execution.
