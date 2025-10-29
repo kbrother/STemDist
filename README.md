@@ -31,5 +31,14 @@ The distillation process of STemDist is implemented in `stemdist.py`.
 * `-nrr`, `--node_reduce_rate`: Compression ratio for the spatial dimension.
 * `-srr`, `--sereis_reduce_rate`: Compression ratio for the temporal dimension.
 * `-e`, `--epoch`: Number of outer iterations.
-* `-ned`, `--ne_dim`: Hidden dimension in the location embedding model.
+* `-ned`, `--ne_dim`: Hidden dimension of the location embedding model.
 * `-s`, `--seed`: Seed of execution.
+* `-sp`, `--save_path`: Path for saving the result files.
+* `-c`, `--check_freq`: Period in outer iterations for checking the performance of the distilled dataset.
+
+### Example command
+```
+  python -m stemdist -de 0 -d ../data/GBA -e 100 -sp results/dc_dsa_cluster_gba_1e-3_1e-3 -lrf 1e-3 -lrs 1e-3 -srr 0.1 -nrr 0.1 -b 256 -ned 32 -s 0 -c 5
+```
+
+
