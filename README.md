@@ -62,3 +62,12 @@ Checking the performance of the distilled dataset is implemented in `model/load_
 ```
    python -m model.load_mtgnn_stemdist -de 0 -d ../data/GBA -lr 0.01 -e 400 -b 128 -lp results/stemdist_gba_1e-3_1e-3.pt -s 0 
 ```
+
+## Real-world datasets which we used
+|Name|M (# time series)|N (# locations)|F (# features)|# Total data points|Source|Downlaod Link|
+|-|-|-|-|-|-|-|
+|GBA|1,997|2,352|1|4,649,904|[PatchSTG](https://github.com/lmissher/patchstg)|[Link](https://www.dropbox.com/scl/fo/2y7wtmmgobsgj359kso3j/AKwXqwmRWifW9e_uArtMHEY?rlkey=8vkvhaj2y14mhif79hit2ae0k&st=hxb9yf8c&dl=0)|
+|GLA|1,997|3,834|1|7,579,818|[PatchSTG](https://github.com/lmissher/patchstg)|[Link](https://www.dropbox.com/scl/fo/w756fegl6c0ek2xnvd61d/AGcHKDOTUeZriAnWgn8TJeU?rlkey=0klfypwm8xxqtpmxkzqpiuez7&st=ren9qisg&dl=0)|
+|ERA5|2,137|6,561|6|14,020,857|[Climate Data Store](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview)|[Link](https://www.dropbox.com/scl/fo/w08d40g6z8l7nbqs4jie6/AATX1x8gc5b8NMp6V90arMU?rlkey=by3580rtr1bgt5dyb8cjsuj70&st=0rbxqueo&dl=0)|
+|CAMS|2,556|7,070|6|108,425,520|[ECMWF](https://www.ecmwf.int/en/forecasts/dataset/cams-global-reanalysis)|[Link](https://www.dropbox.com/scl/fo/ul1hrzsbdabvt3exgbygh/AB9QZ0-BI-FvJF5JBxTdkXc?rlkey=wq9y9qnw7k4hor6gvdt8j4wx9&st=9dvuv795&dl=0)|
+|CA|1,997|8,600|1|17,002,200|[PatchSTG](https://github.com/lmissher/patchstg)|[Link](https://www.dropbox.com/scl/fo/6kprmjr8p9v1yy1kg65wa/ALidoPgwv7AbmUp6J-sNYJw?rlkey=2k7niewn6c691u7b1e1mh0dxe&st=hkze3x4h&dl=0)|
