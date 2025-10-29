@@ -42,5 +42,5 @@ The distillation process of STemDist is implemented in `stemdist.py`.
 ```
 
 ### Example output
-* dc_dsa_cluster_gba_1e-3_1e-3.pt: Saves the distilled dataset.
-* dc_dsa_cluster_gba_1e-3_1e-3.txt: Saves the performance of distilled datasets for every 'check_freq' outer iteration.
+* `dc_dsa_cluster_gba_1e-3_1e-3.pt`: Saves the distilled dataset.
+* `dc_dsa_cluster_gba_1e-3_1e-3.txt`: Saves the performance of distilled datasets for every 'check_freq' outer iteration.
