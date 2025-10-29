@@ -44,3 +44,21 @@ The distillation process of STemDist is implemented in `stemdist.py`.
 ### Example output
 * `dc_dsa_cluster_gba_1e-3_1e-3.pt`: Saves the distilled dataset.
 * `dc_dsa_cluster_gba_1e-3_1e-3.txt`: Saves the performance of distilled datasets for every 'check_freq' outer iteration.
+
+
+## Checking the performance of the distilled dataset
+Checking the performance of the distilled dataset is implemented in `model/load_mtgnn_stemdist.py`.
+
+### Positional arguments
+* `-de, -d, -s, -ned, -sp`: Same with the cases of running `stemdist.py`.
+* `-b`, `--batch_size`: Batch size for the validation of the trained model.
+* `-lr`, `--lr`: Learning rate for training the model.
+* `-e`, `--epochs`: Number of training epochs for the model.
+* `-c`, `--check`: Period in epochs for checking the performance of the trained model.
+* `-lp`, `--load_path`: Path which saves the distilled dataset.
+* `-a`, `--ae`: Compute error in Relative MSE when given.
+
+### Example command
+```
+   python -m model.load_mtgnn_stemdist -de 0 -d ../data/GBA -lr 0.01 -e 400 -b 128 -lp results/stemdist_gba_1e-3_1e-3.pt -s 0 
+```
