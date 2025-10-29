@@ -13,3 +13,9 @@ scipy==1.16.3
 torch==2.2.0
 tqdm==4.65.0
 ```
+
+## Input formats
+Please download and check the datasets below for more details.
+
+* There are three npz files (`train.npz, val.npz, test.npz`) per dataset.
+* Each file contains two arrays, `x` and `y`. `x` is an array of input time series, and `y` is an array of target time series.
