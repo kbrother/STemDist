@@ -10,9 +10,9 @@ from model import *
 import torch.optim as optim
 import math
 import sys
-from reparam_module import ReparamModule
+from MTT.reparam_module import ReparamModule
 import copy
-from distill_orig import DataDistill
+from distill_orig2 import DataDistill
 
 class Traj_Matching(DataDistill):
 
@@ -36,19 +36,24 @@ class Traj_Matching(DataDistill):
             out_dim = data['train_loader'].ys.shape[3]
         else: 
             out_dim = 1
-        
+
+        min_val_loss = sys.float_info.max
+
         for i in tqdm(range(args.epochs)):
             buffer_index = random.randint(0, args.num_experts - 1)
             expert_traj = torch.load(args.params + f"replay_buffer_{buffer_index}.pt")
             data['train_loader'].shuffle()
-
             student_net = gtnet(True, True, 2, num_nodes, 
-                  device, predefined_A=None, use_static_feat=False,
+                  device, predefined_A=None, use_static_feat=True,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=args.seq_length, in_dim=in_dim, out_dim=out_dim,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim) 
             student_net.to(self.device)
+            nm_input_syn = torch.mean(synx, dim=0) # seq_length x num_nodes x in_dim
+            nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
+            nm_input_syn = torch.reshape(nm_input_syn, (nm_input_syn.shape[0], -1))           
+            student_net.embed_forward(nm_input_syn)
 
             student_net = ReparamModule(student_net)
             student_net.train()
@@ -86,13 +91,19 @@ class Traj_Matching(DataDistill):
             args.lr_teacher = syn_lr
             
             print(f"epoch:{i}, train loss: {grand_loss.item()}")
-            if (i+1)%10== 0:
+            if (i+1)%args.check_freq== 0:
                 min_i, val_loss, test_loss = self.test_syn()
                 print(f"epoch: {i}, min i: {min_i}, train_loss: {grand_loss.item()}, val loss: {math.sqrt(val_loss)}, test loss: {math.sqrt(test_loss)}")
                 with open(args.save_path, 'a') as f:
                     f.write(f"epoch: {i}, min i: {min_i}, train_loss: {grand_loss.item()}, val loss: {math.sqrt(val_loss)}, test loss: {math.sqrt(test_loss)}\n")
 
-# python -m MTT.traj_matching_mtgnn -de 2 -e 1000 -d '../data/METR-LA' --params '../data/params/METR-LA-MTGNN/' -sp results/tm_metr.txt -lrf 1e-2 -lrs 1e-3 -sr 2e-3 
+                if min_val_loss > val_loss:
+                    min_val_loss = val_loss
+                    synx_ = synx.detach().clone().cpu()
+                    syny_ = syny.detach().clone().cpu()                    
+                    torch.save({'x':synx_, 'y':syny_}, args.save_path + ".pt")
+
+# python -m MTT.distill_mtgnn_traj_matching -de 7 -e 400 -d '../data/GBA' --params '../data/params/GBA-MTGNN/' -sp results/tm_gba.txt -lrf 1e-2 -lrs 1e-3 -sr 0.1 -nr 0.1
 # python -m MTT.traj_matching_mtgnn -de 4 -e 1000 -d '../data/AURORA' --params '../data/params/AURORA-MTGNN/' -sp results/tm_aurora.txt -lrf 1e-2 -lrs 1e-3 -sr 2e-3 
 # python -m MTT.traj_matching_mtgnn -de 1 -e 1000 -d '../data/PEMS-BAY' --params '../data/params/PEMS-BAY-MTGNN/' -sp results/tm_pems.txt -lrf 1e-2 -lrs 1e-3 -sr 2e-3 
 
@@ -122,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument('--expert_epoch', type=int, default=2, help='how many expert epochs the target params are')
     parser.add_argument('--syn_steps', type=int, default=10, help='how many steps to take on synthetic data')
     parser.add_argument('--ne_dim', type=int, default=32, help='')
+    parser.add_argument('--check_freq', type=int, default=10, help='how often to check the synthetic data')
     
     args = parser.parse_args()
     

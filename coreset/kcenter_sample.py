@@ -4,7 +4,7 @@ import random
 import torch
 import numpy as np
 
-
+# series k-center selection
 def kcenter_selection(xs, ys, k, device='cpu'):
     xs_flat = xs.reshape(xs.shape[0], -1)
     ys_flat = ys.reshape(ys.shape[0], -1)
@@ -38,6 +38,50 @@ def kcenter_selection(xs, ys, k, device='cpu'):
     return selected_indices
 
 
+# node k-center selection
+def kcenter_selection_spatial(xs, ys, k, device='cpu'): 
+    if isinstance(xs, np.ndarray):
+        xs = torch.tensor(xs, dtype=torch.float, device=device)
+    else:
+        xs = torch.tensor(xs, dtype=torch.float).to(device)
+    
+    if isinstance(ys, np.ndarray):
+        ys = torch.tensor(ys, dtype=torch.float, device=device)
+    else:
+        ys = torch.tensor(ys, dtype=torch.float).to(device)
+    
+    N, T, S, F = xs.shape 
+    xs_node = xs.permute(2, 0, 1, 3).contiguous().reshape(S, N * T * F) 
+    ys_node = ys.permute(2, 0, 1).contiguous().reshape(S, N * T) 
+    features = torch.cat([xs_node, ys_node], dim=1)
+
+    # --- k-center greedy (farthest-first) over S nodes ---
+    selected_indices = []
+    first_center = torch.randint(0, S, (1,), device=device).item()
+    selected_indices.append(first_center)
+
+    for _ in range(k - 1):
+        unselected_mask = torch.ones(S, dtype=torch.bool, device=device)
+        unselected_mask[selected_indices] = False
+        unselected_indices = torch.where(unselected_mask)[0]
+        if unselected_indices.numel() == 0:
+            break
+
+        selected_features = features[selected_indices]          # (m, D)
+        unselected_features = features[unselected_indices]      # (S-m, D)
+        
+        distances = torch.cdist(unselected_features, selected_features)
+        min_distances, _ = torch.min(distances, dim=1)
+
+        next_center_idx = torch.argmax(min_distances).item()
+        next_center = unselected_indices[next_center_idx].item()
+        selected_indices.append(next_center)
+
+    print(f"Spatial k-center completed. Selected {len(selected_indices)} nodes.")
+    return selected_indices
+
+
+
 # python -m coreset.kcenter_sample -d ../data/GBA -rr 0.01 -sp results/kcenter_gba.pt
 # python -m coreset.kcenter_sample -d ../data/GLA -rr 0.01 -sp results/kcenter_gla.pt
 # python -m coreset.kcenter_sample -d ../data/ERA5 -rr 0.01 -sp results/kcenter_era5.pt
@@ -47,11 +91,13 @@ def kcenter_selection(xs, ys, k, device='cpu'):
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
-    args.add_argument('-rr', '--reduction_rate',type=float,default=1e-3,help='reduction rate')
+    # args.add_argument('-rr', '--reduction_rate',type=float,default=1e-3,help='reduction rate')
+    args.add_argument('-srr', '--series_reduction_rate',type=float,default=1e-3,help='reduction rate')
+    args.add_argument('-nrr', '--node_reduction_rate',type=float,default=1e-3,help='reduction rate')
     args.add_argument('-sp', '--save_path', type=str, default='results/', help='save path')
     args.add_argument('-b', '--batch_size', type=int, default=2**8, help='batch size')
     args.add_argument('-s', '--seed', type=int, default=0, help='random seed')
-    args.add_argument('-de', '--device', type=str, default='cpu', help='device to use')
+    args.add_argument('-de', '--device', type=int, default=0, help='')
     args = args.parse_args()    
 
     random.seed(args.seed)
@@ -59,15 +105,29 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     
     data = util.load_dataset(args.data, args.batch_size)
-    num_total = data['train_loader'].xs.shape[0]
-    num_elems = round(args.reduction_rate * num_total)
-    
     xs = data['train_loader'].xs
     ys = data['train_loader'].ys
-    sampled_idx = kcenter_selection(xs, ys, num_elems, args.device)
+    # print(f'xs: {xs.shape}, ys: {ys.shape}')
     
-    synx = data['train_loader'].xs[sampled_idx]
-    syny = data['train_loader'].ys[sampled_idx]
+    # device 설정
+    if isinstance(args.device, int):
+        device = f'cuda:{args.device}' if torch.cuda.is_available() and args.device >= 0 else 'cpu'
+    else:
+        device = args.device
+    
+    # 샘플 차원(1186) 줄이기
+    num_total_samples = xs.shape[0]
+    num_elems_samples = round(args.series_reduction_rate * num_total_samples)
+    sampled_idx = kcenter_selection(xs, ys, num_elems_samples, device)
+    
+    # 공간 차원(2352) 줄이기
+    num_total_spatial = xs.shape[2]
+    num_elems_spatial = round(args.node_reduction_rate * num_total_spatial)
+    spatial_idx = kcenter_selection_spatial(xs, ys, num_elems_spatial, device)
+    
+    # 샘플 차원과 공간 차원 모두 적용
+    synx = data['train_loader'].xs[sampled_idx][:, :, spatial_idx, :]
+    syny = data['train_loader'].ys[sampled_idx][:, :, spatial_idx]
     synx = torch.tensor(synx, dtype=torch.float)
     syny = torch.tensor(syny, dtype=torch.float)
     syny = data['scaler'].transform(syny)

@@ -19,15 +19,23 @@ class Traj_Matching:
         self.args = args
         self.device = device
         self.num_series = int(args.series_reduce_rate * data['train_loader'].xs.shape[0])
+        self.num_nodes = int(args.node_reduce_rate * data['train_loader'].xs.shape[2])
         scaler = data['scaler']        
 
         # Define condensed data
-        num_series_total = data['train_loader'].xs.shape[0]
+        num_series_total = data['train_loader'].xs_orig.shape[0]
+        num_nodes_total = data['train_loader'].xs_orig.shape[2]
+        num_seq = data['train_loader'].xs.shape[1]
+        num_feat = data['train_loader'].xs.shape[3]
+
         sampled_idx1 = random.sample(list(range(num_series_total)), self.num_series)
+        sampled_idx1.sort()        
+        sampled_idx2 = random.sample(list(range(num_nodes_total)), self.num_nodes)
+        sampled_idx2.sort()
         
-        self.synx = self.data['train_loader'].xs[sampled_idx1, :, :, 0]
+        self.synx = self.data['train_loader'].xs[sampled_idx1][:, :, sampled_idx2, :]     
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)        
-        self.syny = self.data['train_loader'].ys[sampled_idx1, :, :]
+        self.syny = self.data['train_loader'].ys[sampled_idx1][:, :, sampled_idx2]
         self.syny = scaler.transform(self.syny)
         self.syny = torch.tensor(self.syny, device=device, dtype=torch.float)
 
@@ -45,9 +53,8 @@ class Traj_Matching:
         syny = self.syny.detach().clone()
 
         scaler = data['scaler']
-        num_nodes = data['train_loader'].xs.shape[2]
         seq_len = data['train_loader'].xs.shape[1]
-        _model = Model(seq_len, seq_len, num_nodes)
+        _model = Model(seq_len, seq_len, self.num_nodes)
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max
@@ -90,7 +97,6 @@ class Traj_Matching:
         min_val_loss = sys.float_info.max
 
         scaler = data['scaler']
-        num_nodes = data['train_loader'].xs.shape[2]
         seq_len = data['train_loader'].xs.shape[1]
 
         for i in tqdm(range(args.epochs)):
@@ -98,7 +104,7 @@ class Traj_Matching:
             expert_traj = torch.load(args.params + f"replay_buffer_{buffer_index}.pt")
             data['train_loader'].shuffle()
 
-            student_net = Model(seq_len, seq_len, num_nodes)
+            student_net = Model(seq_len, seq_len, self.num_nodes)
             student_net.to(self.device)
             student_net = ReparamModule(student_net)
             student_net.train()
@@ -115,7 +121,6 @@ class Traj_Matching:
             plugin_params = torch.cat([p.data.to(self.device).reshape(-1) for p in plugin_params], 0)
                       
             for _ in range(args.syn_steps):
-                # print(synx.shape())
                 output_syn = student_net(synx, flat_param=student_params).squeeze()       
                 synx = torch.tensor(synx, device=device, dtype=torch.float) 
                 loss_syn = F.mse_loss(output_syn, syny)
@@ -143,7 +148,7 @@ class Traj_Matching:
                 args.lr_teacher = syn_lr
             
             print(f"epoch:{i}, train loss: {grand_loss.item()}")
-            if (i+1)%5== 0:
+            if (i+1)%args.check_freq== 0:
                 min_i, val_loss, test_loss = self.test_syn()
                 val_loss = math.sqrt(val_loss)
                 test_loss = math.sqrt(test_loss)
@@ -170,7 +175,8 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--batch_size', type=int, default=64, help='batch sizefor real data')#128
     parser.add_argument('-lrs', '--lr_syn',type=float,default=1e-3,help='learning rate for testing on synthetic data')
     parser.add_argument('-lrf', '--lr_feat',type=float,default=0.1,help='learning rate for updating synthetic data')
-    parser.add_argument('-sr', '--series_reduce_rate',type=float,default=2e-2,help='learning rate')
+    parser.add_argument('-sr', '--series_reduce_rate',type=float,default=2e-2,help='series reduce rate')
+    parser.add_argument('-nr', '--node_reduce_rate',type=float,default=2e-2,help='node reduce rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/') 
@@ -186,6 +192,7 @@ if __name__ == "__main__":
     parser.add_argument('--expert_epoch', type=int, default=2, help='how many expert epochs the target params are')
     parser.add_argument('--syn_steps', type=int, default=10, help='how many steps to take on synthetic data')
     parser.add_argument('--beta', type=float, default=0.01, help='CondTSF addtive ratio')
+    parser.add_argument('--check_freq', type=int, default=10, help='how often to check the synthetic data')
 
     args = parser.parse_args()
     
@@ -201,3 +208,6 @@ if __name__ == "__main__":
 
     algo = Traj_Matching(dataloader, args, device)    
     algo.train()
+
+
+# python -m CondTSF.distill_dlinear_condtsf -e 100 -d '../data/GBA' --params '../data/params/GBA-Dlinear/' -sr 0.1 -nr 0.1 -lrf 1e-3 -lrs 1e-2 -sp results/condtsf_aurora_3_2 -de 5 -s 0
