@@ -9,7 +9,7 @@ import random
 from model import *
 import math
 import sys
-from CondTSF.reparam_module import ReparamModule
+from MTT.reparam_module import ReparamModule
 import copy
 
 class Traj_Matching:
@@ -33,7 +33,7 @@ class Traj_Matching:
         sampled_idx2 = random.sample(list(range(num_nodes_total)), self.num_nodes)
         sampled_idx2.sort()
         
-        self.synx = self.data['train_loader'].xs[sampled_idx1][:, :, sampled_idx2, :]     
+        self.synx = self.data['train_loader'].xs[sampled_idx1][:, :, sampled_idx2, 0]     
         self.synx = torch.tensor(self.synx, device=device, dtype=torch.float)        
         self.syny = self.data['train_loader'].ys[sampled_idx1][:, :, sampled_idx2]
         self.syny = scaler.transform(self.syny)
@@ -105,6 +105,7 @@ class Traj_Matching:
             data['train_loader'].shuffle()
 
             student_net = Model(seq_len, seq_len, self.num_nodes)
+            # print(f"student_net params: {student_net.state_dict()}")
             student_net.to(self.device)
             student_net = ReparamModule(student_net)
             student_net.train()
@@ -210,4 +211,4 @@ if __name__ == "__main__":
     algo.train()
 
 
-# python -m CondTSF.distill_dlinear_condtsf -e 100 -d '../data/GBA' --params '../data/params/GBA-Dlinear/' -sr 0.1 -nr 0.1 -lrf 1e-3 -lrs 1e-2 -sp results/condtsf_aurora_3_2 -de 5 -s 0
+# python -m CondTSF.distill_dlinear_condtsf -e 100 -d '../data/GBA' --params '../data/params/GBA-Dlinear/' -sr 0.1 -nr 0.1 -lrf 1e-3 -lrs 1e-2 -sp results_r2o1/condtsf_aurora_3_2 -de 5 -s 0
