@@ -91,7 +91,7 @@ class GradMatch:
         nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
         nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
         nm_input_syn = torch.reshape(nm_input_syn, (self.num_nodes, -1))
-        for i in tqdm(range(100)):  
+        for i in tqdm(range(args.check_epoch)):  
             _model.train()
             _model.embed_forward(nm_input_syn)
             output_syn = _model(synx.transpose(1,3)).squeeze()
@@ -254,6 +254,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check', type=int, default=10, help='')
+    parser.add_argument('-ce', '--check_epoch', type=int, default=100, help='')
     
     args = parser.parse_args()
     

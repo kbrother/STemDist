@@ -17,10 +17,6 @@ import torch.nn.functional as F
 def test_syn(args, data, raw_data, device):
     synx = raw_data['x'].to(device)
     syny = raw_data['y'].to(device)
-    if 'w' in raw_data:
-        _weight = raw_data['w'].to(device)
-    else:
-        _weight = None
     print("load finish")
     print(synx.shape)
     print(syny.shape)
@@ -55,21 +51,20 @@ def test_syn(args, data, raw_data, device):
         _model.train()
         _model.embed_forward(nm_input_syn)
         output_syn = _model(synx.transpose(1, 3)).squeeze()
-        if _weight is None:
-            loss_syn = F.mse_loss(output_syn, syny)
-        else:
-            loss_syn = torch.square(output_syn - syny) * _weight
-            loss_syn = torch.mean(loss_syn)
+        loss_syn = F.mse_loss(output_syn, syny)
             #loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
         loss_syn.backward()
         optimizer.step()
 
         _model.eval()
-        if (i+1)%10 == 0:
+        if (i+1)%args.check == 0:
             with torch.no_grad():
                 _model.embed_forward(nm_input_real)
-                val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
+                if args.ae:
+                    val_loss = _model.test_model(data['val_loader'], scaler, device, args.ae)
+                else:
+                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
     
             print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
             if min_val_loss > val_loss:
@@ -81,11 +76,16 @@ def test_syn(args, data, raw_data, device):
     _model.eval()
     with torch.no_grad():    
         _model.embed_forward(nm_input_real)
-        test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
+        if args.ae:
+            test_loss = _model.test_model(data['test_loader'], scaler, device, args.ae)
+        else:
+            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
     print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
+    with open(args.save_path, "a") as f:
+        f.wirte(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")
 
 
-# python -m model.load_mtgnn -de 3 -d ../data/GBA -lr 0.01 -e 400 -b 128 -lp results/dc_gba.pt -s 0 -ned 32
+# python -m model.load_mtgnn -de 3 -d ../data/GBA -lr 0.01 -e 400 -lp results/dc_gba.pt -s 0 -ned 32 -c 10
 # python -m model.load_mtgnn -de 2 -d ../data/GLA -lr 0.01 -e 400 -b 128 -lp results/dc_gla_1e-2.pt -s 0 -ned 32
 # python -m model.load_mtgnn -de 2 -d ../data/ERA5 -lr 0.01 -e 400 -b 128 -lp results/dc_dsa_cluster_era5_1e-3.pt -s 0 -ned 32
 # python -m model.load_mtgnn -de 1 -d ../data/AURORA -lr 3e-4 -e 200 -b 32 -lp results/dc_aurora_1e-3.pt -s 0 -ned 32
@@ -100,6 +100,9 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/')
     parser.add_argument('-ned', '--ne_dim',type=int,default=128,help='')
+    parser.add_argument('-c', '--check', type=int, default=5, help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/')
+    parser.add_argument('-a', '--ae', action='store_true')
     args = parser.parse_args()
 
     # random seed setting
