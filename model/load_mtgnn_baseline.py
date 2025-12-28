@@ -16,33 +16,23 @@ import torch.nn.functional as F
 
 def test_syn(args, data, synx, syny, device):    
     scaler = dataloader['scaler']
-    num_nodes = dataloader['train_loader'].xs_orig.shape[2]
+    num_nodes = dataloader['train_loader'].xs.shape[2]
     in_dim = dataloader['train_loader'].xs.shape[3]    
     seq_len = dataloader['train_loader'].xs.shape[1]    
     out_dim = 1
     _model = gtnet(True, True, 2, num_nodes, 
-                  device, predefined_A=None, use_static_feat=True,
+                  device, predefined_A=None, use_static_feat=False,
                   dropout=0.3, subgraph_size=20,
                   node_dim=10, dilation_exponential=1,             
                   seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
-                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True, ne_dim=args.ne_dim)       
+                  layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
     _model.to(device)
     optimizer = torch.optim.Adam(params=_model.parameters(), lr=args.lr)
     _model = _model.to(device)
-    min_val_loss = sys.float_info.max
    
-    nm_input_real = np.mean(data['train_loader'].xs_orig, axis=0)  # seq_length x num nodes x in_dim
-    nm_input_real = np.transpose(nm_input_real, (1, 0, 2))   # num_nodes x seq length x in_dim
-    nm_input_real = torch.tensor(nm_input_real, dtype=torch.float, device=device)    
-    nm_input_real = torch.reshape(nm_input_real, (num_nodes, -1))   # num_nodes x seq length*in_dim
-    
-    nm_input_syn = torch.mean(synx, dim=0)   # seq_length x num_nodes x in_dim
-    nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
-    nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
-    
+    min_val_loss = sys.float_info.max
     for i in tqdm(range(args.epochs)):
         _model.train()
-        _model.embed_forward(nm_input_syn)
         output_syn = _model(synx.transpose(1, 3)).squeeze()
         loss_syn = F.mse_loss(output_syn, syny)
         optimizer.zero_grad()
@@ -52,7 +42,6 @@ def test_syn(args, data, synx, syny, device):
         _model.eval()
         if (i+1)%args.check == 0:
             with torch.no_grad():
-                _model.embed_forward(nm_input_real)
                 if args.ae:
                     val_loss = _model.test_model(data['val_loader'], scaler, device, args.ae)
                 else:
@@ -76,7 +65,7 @@ def test_syn(args, data, synx, syny, device):
         f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
 
 
-# python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/kcenter_gba.pt -s 0 -ae True
+# python -m model.load_mtgnn_baseline -de 0 -d ../data/GBA -lr 1e-4 -e 400 -b 128 -lp results/condtsf_gba_0.pt -s 0 -ae True
 # python -m model.load_mtgnn_baseline -de 4 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 0
 # python -m model.load_mtgnn_baseline -de 0 -d ../data/GLA -lr 1e-3 -e 400 -b 128 -lp results/random_gla_0.pt -s 3
 # python -m model.load_mtgnn_baseline -de 4 -d ../data/ERA5 -lr 1e-3 -e 100 -b 128 -lp results/random_era5_0.pt -s 0
@@ -92,9 +81,9 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-c', '--check', type=int, default=5, help='')
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
-    parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-a', '--ae', action='store_true')
-    parser.add_argument('-ned', '--ne_dim',type=int,default=32,help='')
+    parser.add_argument('-sp', '--save_path', type=str, default='results/') 
+    parser.add_argument('--condtsf', type=bool, default=False)
     args = parser.parse_args()
 
     # random seed setting
@@ -116,4 +105,10 @@ if __name__ == "__main__":
     print("load finish")
     print(synx.shape)
     print(syny.shape)
+
+    if args.condtsf == True:
+        dataloader['train_loader'].xs = np.expand_dims(dataloader['train_loader'].xs[..., 0], axis=-1)
+        dataloader['val_loader'].xs = np.expand_dims(dataloader['val_loader'].xs[..., 0], axis=-1)
+        dataloader['test_loader'].xs = np.expand_dims(dataloader['test_loader'].xs[..., 0], axis=-1)
+
     test_syn(args, dataloader, synx, syny, device)
