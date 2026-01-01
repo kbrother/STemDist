@@ -93,7 +93,7 @@ class GradMatchCluster:
         _weight = torch.tensor(data['train_loader'].label_cnt, device=device)
         _weight = _weight.unsqueeze(0).unsqueeze(0)
         num_sample = round(self.num_nodes/4)
-        for i in tqdm(range(100)):  
+        for i in tqdm(range(args.check_epoch)):  
             _model.train()
             _order = list(range(self.num_nodes))
             random.shuffle(_order)
@@ -282,6 +282,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
+    parser.add_argument('-ce', '--check_epoch', type=int, default=10, help='')
     
     args = parser.parse_args()
     
