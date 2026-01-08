@@ -283,7 +283,9 @@ if __name__ == "__main__":
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
     parser.add_argument('-ce', '--check_epoch', type=int, default=10, help='')
-    
+    parser.add_argument('-lt', '--loader_type', type=str, default='kmeans', help='data path')
+    parser.add_argument('-nr', '--num_rows', type=int, default=10, help='')
+    parser.add_argument('-nc', '--num_cols', type=int, default=10, help='')
     args = parser.parse_args()
     
     # random seed setting
@@ -294,7 +296,8 @@ if __name__ == "__main__":
 
     device = torch.device(f"cuda:{args.device}")
     #device = torch.device(f"cpu")
-    dataloader =  util.load_dataset(args.data, args.batch_size, "1", args.node_reduce_rate, device)
+    dataloader =  util.load_dataset(args.data, args.batch_size, args.loader_type, args.node_reduce_rate, device,
+                                   args.num_rows, args.num_cols)
     print("load finish")
 
     algo = GradMatchCluster(dataloader, args, device)    

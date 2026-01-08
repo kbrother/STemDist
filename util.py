@@ -9,6 +9,12 @@ import random
 from sklearn.cluster import KMeans
 from fast_pytorch_kmeans import KMeans
 from sklearn.metrics import pairwise_distances
+from shapely.geometry import box
+import geopandas as gpd
+from sklearn.decomposition import PCA
+import pandas as pd
+import pygeoda
+
 
 class DataLoader(object):
     def __init__(self, xs, ys, batch_size):
@@ -61,35 +67,6 @@ class DataLoader(object):
             self.shuffle()
             
         return (x_i, y_i)
-
-
-class DataLoaderCluster2(DataLoader):
-    def __init__(self, xs, ys, batch_size, num_clusters, device):
-        super().__init__(xs, ys, batch_size)
-        kmeans = KMeans(n_clusters=num_clusters, mode='euclidean', init_method="kmeans++")
-        xs = np.transpose(xs, (2, 0, 1, 3))  # num nodes x num sereis x 12 x 2
-        num_nodes, num_series = xs.shape[0], xs.shape[1]
-        seq_len, num_feat = xs.shape[2], xs.shape[3]
-        xs = np.reshape(xs, (num_nodes, -1))   # num nodes x ... 
-        input_xs = torch.tensor(xs, device=device, dtype=torch.float)
-        labels = kmeans.fit_predict(input_xs).cpu().numpy()        
-        xs = kmeans.centroids.cpu().numpy()  # num nodes x ...
-        xs = np.reshape(xs, (num_clusters, num_series, seq_len, num_feat))
-        xs = np.transpose(xs, (1,2,0,3))        
-        self.xs_reduced = xs   
-        
-        self.ys_reduced = np.zeros((num_series, seq_len, num_clusters))
-        self.label_cnt = [0 for _ in range(num_clusters)]
-        for i in range(num_nodes):
-            self.ys_reduced[:, :, labels[i]] = self.ys_reduced[:, :, labels[i]] + ys[:, :, i]
-            self.label_cnt[labels[i]] += 1
-        for i in range(num_clusters):
-            self.ys_reduced[:,:,i] = self.ys_reduced[:,:,i]/self.label_cnt[i]
-        
-        self.node2cluster = [-1 for _ in range(num_nodes)]
-        for n, l in enumerate(labels):            
-            self.node2cluster[n] = l
-        self.node2cluster = np.array(self.node2cluster)
 
 
 def robust_kmeans(xs, num_clusters, num_series, seq_len, num_feat, device='cuda'):
@@ -153,7 +130,62 @@ class DataLoaderCluster(DataLoader):
             # else:
             self.ys[:,:,i] = self.ys[:,:,i]/label_cnt[i]
 
+
+class DataLoaderRedcap(DataLoader):
+    def __init__(self, xs, ys, batch_size, num_clusters, nrows, ncols):
+        self.batch_size = batch_size
+        self.current_ind = 0
+        self.size = len(xs)
+        self.num_batch = math.ceil(self.size/self.batch_size)     
+
+        self.xs_orig = xs  # num sereis x 12 x num nodes x num_feat
+        num_nodes, num_series = xs.shape[2], xs.shape[0]
+        seq_len, num_feat = xs.shape[1], xs.shape[3]
+
+        labels = self.redcap(xs, num_clusters, nrows, ncols)
+        label_cnt = [0 for _ in range(num_clusters)]
+        self.xs = np.zeros((num_series, seq_len, num_clusters, num_feat))        
+        self.ys = np.zeros((num_series, seq_len, num_clusters))
+        for i in range(num_nodes):
+            self.ys[:, :, labels[i]] = self.ys[:, :, labels[i]] + ys[:, :, i]
+            self.xs[:, :,  labels[i], :] = self.xs[:,:,labels[i],:] + xs[:,:,i,:]
+            label_cnt[labels[i]] += 1
+
+        self.label_cnt = label_cnt
+        for i in range(num_clusters):
+            assert label_cnt[i] > 0
+            self.xs[:,:,i,:] = self.xs[:,:,i,:]/label_cnt[i]
+            self.ys[:,:,i] = self.ys[:,:,i]/label_cnt[i]
             
+        
+    def redcap(self, xs, num_clusters, nrows, ncols):
+        num_nodes, num_series = xs.shape[2], xs.shape[0]
+        seq_len, num_feat = xs.shape[1], xs.shape[3]
+        
+        geoms = []
+        ids = []
+        cell_size = 1.0
+        for r in range(nrows):
+            for c in range(ncols):
+                xmin, ymin = c * cell_size, r * cell_size
+                xmax, ymax = xmin + cell_size, ymin + cell_size
+                geoms.append(box(xmin, ymin, xmax, ymax))
+                ids.append(r * ncols + c)
+
+        gdf = gpd.GeoDataFrame({"cell_id": ids}, geometry=geoms, crs="EPSG:3857")
+        _data = xs[:, 0, :, :] # num series x num nodes x num feat
+        _data = np.transpose(_data, (1, 0, 2))
+        _data = np.reshape(_data, (num_nodes, -1))        
+        Xp = PCA(n_components=50).fit_transform(_data)
+        dfX = pd.DataFrame(Xp, columns=[f"f{i}" for i in range(50)])
+        gda = pygeoda.open(gdf) 
+        w = pygeoda.rook_weights(gda)
+        method = "fullorder-wardlinkage"
+
+        res = pygeoda.redcap(num_clusters, w, dfX, method)
+        return np.asarray(res["Clusters"])-1
+        
+    
 class StandardScaler():
     """
     Standard the input
@@ -170,7 +202,7 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def load_dataset(dataset_dir, batch_size, loader_type=None, _ratio=1.0, device=None):
+def load_dataset(dataset_dir, batch_size, loader_type=None, _ratio=1.0, device=None, nrows=None, ncols=None):
     data = {}
     for category in ['train', 'val', 'test']:
         cat_data = np.load(os.path.join(dataset_dir, category + '.npz'))
@@ -186,11 +218,10 @@ def load_dataset(dataset_dir, batch_size, loader_type=None, _ratio=1.0, device=N
 
     if loader_type is not None:
         num_clusters = round(_ratio * data['x_train'].shape[2])
-
-        if loader_type == "1":
-            data['train_loader'] = DataLoaderCluster(data['x_train'], data['y_train'], batch_size, num_clusters, device)
-        else:
-            data['train_loader'] = DataLoaderCluster2(data['x_train'], data['y_train'], batch_size, num_clusters, device)
+        if loader_type == "kmeans":
+            data['train_loader'] = DataLoaderCluster(data['x_train'], data['y_train'], batch_size, num_clusters, device)          
+        elif loader_type == "redcap":
+            data['train_loader'] = DataLoaderRedcap(data['x_train'], data['y_train'], batch_size, num_clusters, nrows, ncols)       
     else:
         data['train_loader'] = DataLoader(data['x_train'], data['y_train'], batch_size)
 
