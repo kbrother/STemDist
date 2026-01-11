@@ -209,3 +209,35 @@ class gtnet(nn.Module):
             loss_sum += curr_loss.item()
             naive_loss_sum += curr_naive_loss.item()
         return loss_sum/naive_loss_sum
+
+      
+    def test_model2(self, dataloader, scaler, device, ae, idx, num_divide, num_sample):
+        loss_sum, naive_loss_sum = 0, 0
+
+        y_mean = 0
+        num_entry = 0
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            valy = torch.tensor(y, device=device, dtype=torch.float)
+            mask = (valy != 0.).float()            
+            num_entry += torch.sum(mask)
+            y_mean += torch.sum(valy)
+        y_mean /= num_entry
+
+        for iter, (x, y) in enumerate(dataloader.get_iterator()):
+            if idx < num_divide - 1:
+                valx = torch.tensor(x[:,:,num_sample*idx:num_sample*(idx+1)], device=device, dtype=torch.float)
+                valy = torch.tensor(y[:,:,num_sample*idx:num_sample*(idx+1)], device=device, dtype=torch.float)
+            else:
+                valx = torch.tensor(x[:,:,num_sample*idx:], device=device, dtype=torch.float)
+                valy = torch.tensor(y[:,:,num_sample*idx:], device=device, dtype=torch.float)
+            valx = valx.transpose(1, 3)
+            
+            output = self.forward(valx).squeeze()            
+            output = scaler.inverse_transform(output)
+            if ae:
+                curr_loss, curr_naive_loss = util.masked_ae2(output, valy, 0., y_mean)               
+            else:
+                curr_loss, curr_naive_loss = util.masked_se2(output, valy, 0., y_mean)
+            loss_sum += curr_loss.item()
+            naive_loss_sum += curr_naive_loss.item()
+        return loss_sum, naive_loss_sum
