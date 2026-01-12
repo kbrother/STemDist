@@ -74,7 +74,7 @@ class DataDistill:
         _model.to(self.device)
         optimizer = torch.optim.Adam(_model.parameters(), lr=args.lr_syn)
         min_val_loss = sys.float_info.max              
-        for i in tqdm(range(200)):  
+        for i in tqdm(range(args.check_epoch)):  
             _model.train()            
             output_syn = _model(synx.transpose(1,3)).squeeze()
             loss_syn = F.mse_loss(output_syn, syny)

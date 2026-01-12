@@ -10,7 +10,6 @@ import argparse
 import numpy as np
 import torch.nn.functional as F
 import torch.optim as optim
-import copy
 import math
 from distill_orig import DataDistill
 
@@ -20,9 +19,9 @@ class DistMatch(DataDistill):
     def __init__(self, data, args, device):
         super().__init__(data, args, device)
 
-        num_nodes = dataloader['train_loader'].xs.shape[2]
-        in_dim = dataloader['train_loader'].xs.shape[3]
-        seq_len = dataloader['train_loader'].xs.shape[1]
+        num_nodes = data['train_loader'].xs.shape[2]
+        in_dim = data['train_loader'].xs.shape[3]
+        seq_len = data['train_loader'].xs.shape[1]
         out_dim = 1
         self.trained_model = gtnet(True, True, 2, num_nodes, 
                   device, predefined_A=None, use_static_feat=False,
