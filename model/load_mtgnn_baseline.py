@@ -83,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument('-lp', '--load_path', type=str, default='results/') 
     parser.add_argument('-a', '--ae', action='store_true')
     parser.add_argument('-sp', '--save_path', type=str, default='results/') 
-    parser.add_argument('--condtsf', type=bool, default=False)
+    parser.add_argument('--condtsf', action='store_true')
     args = parser.parse_args()
 
     # random seed setting
