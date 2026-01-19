@@ -12,7 +12,7 @@ import math
 import copy
 
 
-def test_syn(args, data, device):
+def test_syn(args, data, data2, device):
     num_total = data['train_loader'].xs.shape[0]
     num_nodes = data['train_loader'].xs.shape[2]
     in_dim = data['train_loader'].xs.shape[3]
@@ -40,9 +40,10 @@ def test_syn(args, data, device):
     syny = scaler.transform(syny)
     gamma_selected = gamma_selected / torch.sum(gamma_selected) * num_elems
     
+    min_val_loss_ae = sys.float_info.max
     min_val_loss = sys.float_info.max
     for i in tqdm(range(args.epochs)):
-        if (i+1)%args.check == 0:
+        if i%args.check == 0:
             grads = get_grad_fast(_model, data, device)
             selected, gamma_selected, _ = craig(grads.to(device), num_elems, device)
     
@@ -64,28 +65,34 @@ def test_syn(args, data, device):
         _model.eval()
         if (i+1)%args.check == 0:
             with torch.no_grad():
-                if args.ae:
-                    val_loss = _model.test_model(data['val_loader'], scaler, device, args.ae)
-                else:
-                    val_loss = math.sqrt(_model.test_model(data['val_loader'], scaler, device))
+                val_loss_ae = _model.test_model(data2['val_loader'], scaler, device, args.ae)                            
+                val_loss = math.sqrt(_model.test_model(data2['val_loader'], scaler, device))
 
             print(f"epoch :{i}, train loss: {loss_syn}, val loss: {val_loss}")
+            if min_val_loss_ae > val_loss_ae:
+                min_val_loss_ae = val_loss_ae
+                min_params_ae = copy.deepcopy(_model.state_dict())
+
             if min_val_loss > val_loss:
-                min_i = i
                 min_val_loss = val_loss
                 min_params = copy.deepcopy(_model.state_dict())
-
-    _model.load_state_dict(min_params)
+                
+    _model.load_state_dict(min_params_ae)
     _model.eval()
     with torch.no_grad():       
-        if args.ae:
-            test_loss =_model.test_model(data['test_loader'], scaler, device, args.ae)
-        else:
-            test_loss = math.sqrt(_model.test_model(data['test_loader'], scaler, device))
-    print(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}")      
-    with open(args.save_path, "a") as f:
-        f.write(f"min i: {min_i}, val loss: {min_val_loss}, test loss: {test_loss}\n")
+        test_loss_ae =_model.test_model(data2['test_loader'], scaler, device, True)
+    
+    _model.load_state_dict(min_params)
+    _model.eval()
+    with torch.no_grad():
+        test_loss = math.sqrt(_model.test_model(data2['test_loader'], scaler, device))
+    
+    with open(args.save_path + "_a.txt", "a") as f:
+        f.write(f"val loss: {min_val_loss_ae}, test loss: {test_loss_ae}\n")
 
+    with open(args.save_path + ".txt", "a") as f:
+        f.write(f"val loss: {min_val_loss}, test loss: {test_loss}\n")
+        
     
 def craig(grads, budget, device, eps=1e-12):
     num_series, num_feat = grads.shape
@@ -208,6 +215,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--data', type=str, default='../data/METR-LA', help='data path')
     parser.add_argument('-s', '--seed', type=int, default=0, help='')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='batch size')
+    parser.add_argument('-bt', '--batch_size_test', type=int, default=128, help='batch size')
     parser.add_argument('-rr', '--reduction_rate',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-lr', '--lr',type=float,default=1e-3,help='learning rate')
     parser.add_argument('-e', '--epochs',type=int,default=100,help='')
@@ -223,7 +231,8 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(args.seed)
 
     device = torch.device(f"cuda:{args.device}")
-    dataloader =  util.load_dataset(args.data, args.batch_size)
+    dataloader1 =  util.load_dataset(args.data, args.batch_size)
+    dataloader2 =  util.load_dataset(args.data, args.batch_size_test)
     print("load finish")
 
-    test_syn(args, dataloader, device)
+    test_syn(args, dataloader1, dataloader2, device)
