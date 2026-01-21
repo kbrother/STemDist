@@ -49,13 +49,13 @@ def test_syn(args, data, raw_data, device):
     nm_input_syn = torch.transpose(nm_input_syn, 0, 1)  # num nodex x seq_length x in_dim
     nm_input_syn = torch.reshape(nm_input_syn, (synx.shape[2], -1))
     
-    num_sample = round(synx.shape[2]/4)
+    num_sample = round(synx.shape[2]/args.k)
     for i in tqdm(range(args.epochs)):
         _model.train()
         _order = list(range(synx.shape[2]))
         random.shuffle(_order)
-        for j in range(4):
-            if j < 3:
+        for j in range(args.k):
+            if j < (args.k - 1):
                 _idx = _order[num_sample*j:num_sample*(j+1)]
             else:
                 _idx = _order[num_sample*j:]     
@@ -116,6 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('-ned', '--ne_dim',type=int,default=32,help='')
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-a', '--ae', action='store_true')
+    parser.add_argument('-k', '--k', type=int, default=4, help='')
     args = parser.parse_args()
 
     # random seed setting
