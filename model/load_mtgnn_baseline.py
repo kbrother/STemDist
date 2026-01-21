@@ -26,7 +26,6 @@ def test_syn(args, data, synx, syny, device):
                   node_dim=10, dilation_exponential=1,             
                   seq_length=seq_len, in_dim=in_dim, out_dim=out_dim,
                   layers=3, propalpha=0.05, tanhalpha=3, layer_norm_affline=True)      
-    _model.to(device)
     optimizer = torch.optim.Adam(params=_model.parameters(), lr=args.lr)
     _model = _model.to(device)
    
