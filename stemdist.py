@@ -44,6 +44,8 @@ class GradMatchCluster:
         self.syny = nn.Parameter(self.syny)
         print(f'feat x shape: {self.synx.shape}')
         print(f'feat y shape: {self.syny.shape}')
+
+        self.k = args.k
         
         val_sum, test_sum = 0, 0
         num_iter = 3
@@ -92,13 +94,13 @@ class GradMatchCluster:
 
         _weight = torch.tensor(data['train_loader'].label_cnt, device=device)
         _weight = _weight.unsqueeze(0).unsqueeze(0)
-        num_sample = round(self.num_nodes/4)
+        num_sample = round(self.num_nodes/self.k)
         for i in tqdm(range(args.check_epoch)):  
             _model.train()
             _order = list(range(self.num_nodes))
             random.shuffle(_order)
-            for j in range(4):                
-                if j < 3:
+            for j in range(self.k):                
+                if j < (self.k - 1):
                     _idx = _order[num_sample*j:num_sample*(j+1)]
                 else:
                     _idx = _order[num_sample*j:]                                
@@ -124,7 +126,7 @@ class GradMatchCluster:
                     min_val_loss = val_loss
                     min_params = copy.deepcopy(_model.state_dict())
 
-                print(val_loss)
+                # print(val_loss)
         _model.load_state_dict(min_params)
         _model.eval()
         with torch.no_grad():
@@ -158,7 +160,7 @@ class GradMatchCluster:
 
         _weight = torch.tensor(data['train_loader'].label_cnt, device=device)
         _weight = _weight.unsqueeze(0).unsqueeze(0)
-        num_sample = round(self.num_nodes/4)
+        num_sample = round(self.num_nodes/self.k)
         for i in tqdm(range(args.epochs)):
             data['train_loader'].shuffle()
             data['train_loader'].current_ind = 0            
@@ -177,15 +179,14 @@ class GradMatchCluster:
             grad_loss = 0
             num_ol = 20
             num_real_total = 0
-            for ol in range(num_ol):         
-
+            for ol in range(num_ol):
                 _order = list(range(self.num_nodes))
                 random.shuffle(_order)                
                 x, y = data['train_loader'].get_next()                                
                 realx = torch.tensor(x, device=self.device, dtype=torch.float)
                 realy = torch.tensor(y, device=self.device, dtype=torch.float)  
-                for ii in range(4):
-                    if ii < 3:
+                for ii in range(self.k):
+                    if ii < (self.k - 1):
                         _idx = _order[num_sample*ii:num_sample*(ii+1)]
                     else:
                         _idx = _order[num_sample*ii:]                                                      
@@ -229,8 +230,8 @@ class GradMatchCluster:
                 for il in range(num_il):
                     _order = list(range(self.num_nodes))
                     random.shuffle(_order)        
-                    for ii in range(4):
-                        if ii < 3:
+                    for ii in range(self.k):
+                        if ii < (self.k - 1):
                             _idx = _order[num_sample*ii:num_sample*(ii+1)]
                         else:
                             _idx = _order[num_sample*ii:]       
@@ -283,6 +284,7 @@ if __name__ == "__main__":
     parser.add_argument('-sp', '--save_path', type=str, default='results/')
     parser.add_argument('-c', '--check_freq', type=int, default=10, help='')
     parser.add_argument('-ce', '--check_epoch', type=int, default=10, help='')
+    parser.add_argument('-k', '--k', type=int, default=4, help='')
     
     args = parser.parse_args()
     
