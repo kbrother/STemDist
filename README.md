@@ -1,6 +1,6 @@
 # Effective Dataset Distillation for Spatio-Temporal Forecasting with Bi-dimensional Compression
 
-This repository is the official implementation of [Effective Dataset Distillation for Spatio-Temporal Forecasting with Bi-dimensional Compression](https://arxiv.org/abs/2603.10410), Taehyung Kwon*, Yeonje Choi*, Yeongho Kim, and Kijung Shin, ICDE 2026 (to appear).
+This repository is the official implementation of [Effective Dataset Distillation for Spatio-Temporal Forecasting with Bi-dimensional Compression](https://ieeexplore.ieee.org/abstract/document/11629197), Taehyung Kwon*, Yeonje Choi*, Yeongho Kim, and Kijung Shin, ICDE 2026.
 
 ## Requirements
 Please see the requirements.txt
